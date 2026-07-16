@@ -684,7 +684,7 @@ function findPivotAndCompute() {
   if (best >= 0) {
     document.getElementById('extrapDate').value = data.dates[best];
     document.getElementById('extrapInfo').innerHTML =
-      `✅ 匹配历史日：${data.dates[best]}，10Y=${(data.rows[best][t10]*100).toFixed(2)}%`;
+      `✅ 匹配历史日：${data.dates[best]}，10Y=${data.rows[best][t10].toFixed(2)}%`;
     computeExtrapolation();
   } else {
     document.getElementById('extrapInfo').textContent = '⚠ 未找到10Y在±3bp内的历史日期';
