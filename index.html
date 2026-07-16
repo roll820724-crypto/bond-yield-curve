@@ -139,6 +139,10 @@ td.warn{background:#fff3cd}
         </span>
         <button onclick="computeExtrapolation()" style="font-size:12px;padding:3px 10px">计算</button>
       </div>
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
+        <label style="font-size:12px">对比基准日：</label>
+        <input type="date" id="extrapBaseDate" style="font-size:12px;padding:2px 4px">
+      </div>
       <div id="extrapInfo" style="font-size:11px;color:#888;margin-bottom:6px"></div>
       <div id="extrapTable"></div>
     </div>
@@ -632,9 +636,15 @@ function onExtrapMethodChange() {
 
 function initExtrapDate() {
   const inp = document.getElementById('extrapDate');
-  if (!inp || inp.value) return;
-  const data = getData(currentCurve);
-  if (data.dates.length > 0) inp.value = data.dates[data.dates.length - 1];
+  if (inp && !inp.value) {
+    const data = getData(currentCurve);
+    if (data.dates.length > 0) inp.value = data.dates[data.dates.length - 1];
+  }
+  const baseInp = document.getElementById('extrapBaseDate');
+  if (baseInp && !baseInp.value) {
+    const data = getData(currentCurve);
+    if (data.dates.length > 0) baseInp.value = data.dates[data.dates.length - 1];
+  }
 }
 
 function generateBusinessDays(fromStr, toStr) {
@@ -713,13 +723,15 @@ function computeExtrapolation() {
   const showTerms = ['1Y','3Y','5Y','10Y','20Y'];
   const avgTermIdx = ['1Y','3Y','5Y','7Y','10Y','15Y','20Y'].map(t => data.terms.indexOf(t)).filter(i => i >= 0);
   
-  // 当前750MA（用于对比）
-  const curMA = calc750MA(data, lastDate);
+  // 对比基准日750MA
+  const baseDate = document.getElementById('extrapBaseDate').value || lastDate;
+  const baseMA = calc750MA(data, baseDate);
   
-  let html = `<p style="font-size:11px;color:#666;margin-bottom:4px">外推曲线 = ${selDate}，假设未来每日曲线不变</p>`;
+  const baseLabel = baseDate === lastDate ? '当前' : baseDate;
+  let html = `<p style="font-size:11px;color:#666;margin-bottom:4px">外推曲线 = ${selDate}，对比基准 = ${baseLabel}，假设未来每日曲线不变</p>`;
   html += `<table><tr><th>季末</th>`;
   showTerms.forEach(t => html += `<th>${t}</th>`);
-  html += `<th>1-20Y均</th><th>vs当前(bp)</th></tr>`;
+  html += `<th>1-20Y均</th><th>vs ${baseLabel}(bp)</th></tr>`;
   
   quarterEnds.forEach(qe => {
     const qeIdx = allDates.indexOf(qe);
@@ -753,13 +765,13 @@ function computeExtrapolation() {
     const avgV = an > 0 ? +(as/an).toFixed(4) : null;
     html += `<td style="font-weight:600">${avgV != null ? avgV.toFixed(4) : '—'}</td>`;
     
-    // vs 当前差额
-    const curAvg = curMA ? (() => {
+    // vs 基准日差额
+    const baseAvg = baseMA ? (() => {
       let s = 0, c = 0;
-      avgTermIdx.forEach(ti => { if (curMA[ti] != null) { s += curMA[ti]; c++; } });
+      avgTermIdx.forEach(ti => { if (baseMA[ti] != null) { s += baseMA[ti]; c++; } });
       return c > 0 ? s/c : null;
     })() : null;
-    const delta = (avgV != null && curAvg != null) ? (avgV - curAvg) * 100 : null;
+    const delta = (avgV != null && baseAvg != null) ? (avgV - baseAvg) * 100 : null;
     html += `<td class="${delta>0?'up':delta<0?'down':''}">${delta != null ? (delta>0?'+':'')+delta.toFixed(1) : '—'}</td>`;
     html += '</tr>';
   });
