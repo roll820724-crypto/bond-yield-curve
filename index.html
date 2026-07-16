@@ -123,6 +123,25 @@ td.warn{background:#fff3cd}
       </div>
       <div id="m1CompareTable"></div>
     </div>
+    <div class="chart-card">
+      <h2>📈 曲线外推：750MA预测</h2>
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
+        <label style="font-size:12px"><input type="radio" name="extrapMethod" value="date" checked onchange="onExtrapMethodChange()"> 基于日期</label>
+        <label style="font-size:12px"><input type="radio" name="extrapMethod" value="pivot" onchange="onExtrapMethodChange()"> 基于中枢</label>
+        <span id="extrapDateArea">
+          <label style="font-size:12px;margin-left:4px">日期：</label>
+          <input type="date" id="extrapDate" style="font-size:12px;padding:2px 4px">
+        </span>
+        <span id="extrapPivotArea" style="display:none">
+          <label style="font-size:12px;margin-left:4px">中枢(%)：</label>
+          <input type="number" id="extrapPivot" style="font-size:12px;width:70px;padding:2px 4px" step="0.01" placeholder="如 1.80">
+          <button onclick="findPivotAndCompute()" style="font-size:12px;padding:3px 8px">查找</button>
+        </span>
+        <button onclick="computeExtrapolation()" style="font-size:12px;padding:3px 10px">计算</button>
+      </div>
+      <div id="extrapInfo" style="font-size:11px;color:#888;margin-bottom:6px"></div>
+      <div id="extrapTable"></div>
+    </div>
   </div>
 </div>
 
@@ -536,6 +555,7 @@ function renderMode1(data, row, prevRow, lastMonthRow) {
     selA.value = latest;
     selB.value = yearAgo;
     renderMode1Comparison();
+    initExtrapDate();
   })();
 }
 
@@ -597,6 +617,153 @@ function renderMode1Comparison() {
   
   html += '</table>';
   container.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════
+//  曲线外推：750MA预测
+// ═══════════════════════════════════════════════
+
+function onExtrapMethodChange() {
+  const method = document.querySelector('input[name="extrapMethod"]:checked').value;
+  document.getElementById('extrapDateArea').style.display = method === 'date' ? '' : 'none';
+  document.getElementById('extrapPivotArea').style.display = method === 'pivot' ? '' : 'none';
+}
+
+function initExtrapDate() {
+  const inp = document.getElementById('extrapDate');
+  if (!inp || inp.value) return;
+  const data = getData(currentCurve);
+  if (data.dates.length > 0) inp.value = data.dates[data.dates.length - 1];
+}
+
+function generateBusinessDays(fromStr, toStr) {
+  const days = [];
+  const d = new Date(fromStr + 'T00:00:00');
+  const end = new Date(toStr + 'T00:00:00');
+  while (d <= end) {
+    const dow = d.getDay();
+    if (dow !== 0 && dow !== 6) days.push(d.toISOString().slice(0,10));
+    d.setDate(d.getDate() + 1);
+  }
+  return days;
+}
+
+function getNext12QuarterEnds(fromStr) {
+  const d = new Date(fromStr + 'T00:00:00');
+  const qEnds = [[2,31],[5,30],[8,30],[11,31]];
+  let qIdx = 0;
+  for (let i = 0; i < 4; i++) {
+    const qd = new Date(d.getFullYear(), qEnds[i][0], qEnds[i][1]);
+    if (qd >= d) { qIdx = i; break; }
+    if (i === 3) { qIdx = 0; d.setFullYear(d.getFullYear() + 1); }
+  }
+  const results = [];
+  for (let n = 0; n < 12; n++) {
+    const qi = (qIdx + n) % 4;
+    const year = d.getFullYear() + Math.floor((qIdx + n) / 4);
+    let qd = new Date(year, qEnds[qi][0], qEnds[qi][1]);
+    while (qd.getDay() === 0 || qd.getDay() === 6) qd.setDate(qd.getDate() - 1);
+    results.push(qd.toISOString().slice(0,10));
+  }
+  return results;
+}
+
+function findPivotAndCompute() {
+  const pivotStr = document.getElementById('extrapPivot').value;
+  if (!pivotStr) return;
+  const pivot = parseFloat(pivotStr) / 100;
+  const data = getData(currentCurve);
+  const t10 = data.terms.indexOf('10Y');
+  if (t10 < 0) return;
+  let best = -1;
+  for (let i = data.dates.length - 1; i >= 0; i--) {
+    const v = data.rows[i][t10];
+    if (v != null && Math.abs(v - pivot) <= 0.0003) { best = i; break; }
+  }
+  if (best >= 0) {
+    document.getElementById('extrapDate').value = data.dates[best];
+    document.getElementById('extrapInfo').innerHTML =
+      `✅ 匹配历史日：${data.dates[best]}，10Y=${(data.rows[best][t10]*100).toFixed(2)}%`;
+    computeExtrapolation();
+  } else {
+    document.getElementById('extrapInfo').textContent = '⚠ 未找到10Y在±3bp内的历史日期';
+  }
+}
+
+function computeExtrapolation() {
+  const data = getData(currentCurve);
+  if (!data.dates.length) return;
+  const selDate = document.getElementById('extrapDate').value;
+  if (!selDate) return;
+  const selIdx = findDateIndex(data, selDate);
+  if (selIdx < 0) return;
+  const selRow = data.rows[selIdx];
+  const lastDate = data.dates[data.dates.length - 1];
+  const quarterEnds = getNext12QuarterEnds(lastDate);
+  const lastQE = quarterEnds[quarterEnds.length - 1];
+  const nextDay = new Date(lastDate + 'T00:00:00');
+  nextDay.setDate(nextDay.getDate() + 1);
+  const futureDates = generateBusinessDays(nextDay.toISOString().slice(0,10), lastQE);
+  
+  const allDates = [...data.dates, ...futureDates];
+  const allRows = [...data.rows];
+  for (let i = 0; i < futureDates.length; i++) allRows.push([...selRow]);
+  
+  const showTerms = ['1Y','3Y','5Y','10Y','20Y'];
+  const avgTermIdx = ['1Y','3Y','5Y','7Y','10Y','15Y','20Y'].map(t => data.terms.indexOf(t)).filter(i => i >= 0);
+  
+  // 当前750MA（用于对比）
+  const curMA = calc750MA(data, lastDate);
+  
+  let html = `<p style="font-size:11px;color:#666;margin-bottom:4px">外推曲线 = ${selDate}，假设未来每日曲线不变</p>`;
+  html += `<table><tr><th>季末</th>`;
+  showTerms.forEach(t => html += `<th>${t}</th>`);
+  html += `<th>1-20Y均</th><th>vs当前(bp)</th></tr>`;
+  
+  quarterEnds.forEach(qe => {
+    const qeIdx = allDates.indexOf(qe);
+    if (qeIdx < 0) return;
+    
+    html += `<tr><td style="font-weight:600">${qe.slice(0,7)}</td>`;
+    let termMA = [];
+    showTerms.forEach(t => {
+      const ti = data.terms.indexOf(t);
+      if (ti < 0) { html += '<td>—</td>'; return; }
+      let sum = 0, n = 0;
+      const start = Math.max(0, qeIdx - 749);
+      for (let i = start; i <= qeIdx; i++) {
+        if (allRows[i][ti] != null) { sum += allRows[i][ti]; n++; }
+      }
+      const v = n > 0 ? +(sum/n).toFixed(4) : null;
+      termMA.push(v);
+      html += `<td>${v != null ? v.toFixed(4) : '—'}</td>`;
+    });
+    
+    // 1-20Y均
+    let as = 0, an = 0;
+    avgTermIdx.forEach(ti => {
+      let sum = 0, n = 0;
+      const start = Math.max(0, qeIdx - 749);
+      for (let i = start; i <= qeIdx; i++) {
+        if (allRows[i][ti] != null) { sum += allRows[i][ti]; n++; }
+      }
+      if (n > 0) { as += sum/n; an++; }
+    });
+    const avgV = an > 0 ? +(as/an).toFixed(4) : null;
+    html += `<td style="font-weight:600">${avgV != null ? avgV.toFixed(4) : '—'}</td>`;
+    
+    // vs 当前差额
+    const curAvg = curMA ? (() => {
+      let s = 0, c = 0;
+      avgTermIdx.forEach(ti => { if (curMA[ti] != null) { s += curMA[ti]; c++; } });
+      return c > 0 ? s/c : null;
+    })() : null;
+    const delta = (avgV != null && curAvg != null) ? (avgV - curAvg) * 100 : null;
+    html += `<td class="${delta>0?'up':delta<0?'down':''}">${delta != null ? (delta>0?'+':'')+delta.toFixed(1) : '—'}</td>`;
+    html += '</tr>';
+  });
+  html += '</table>';
+  document.getElementById('extrapTable').innerHTML = html;
 }
 
 // ═══════════════════════════════════════════════
