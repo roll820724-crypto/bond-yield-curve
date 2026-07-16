@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>精算利率监测平台</title>
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Microsoft YaHei',sans-serif;background:#f0f2f5;color:#333;padding:20px}
@@ -98,23 +99,23 @@ td.warn{background:#fff3cd}
   <div class="summary-grid" id="m1Summary"></div>
   <div class="chart-grid">
     <div class="chart-card">
-      <h2>📉 收益率曲线（即期 vs 750MA）</h2>
+      <h2>📉 收益率曲线（即期 vs 750MA） <button onclick="exportCurve750()" style="float:right;font-size:10px;padding:1px 6px;background:#2e75b6;color:#fff;border:none;border-radius:3px;cursor:pointer">📥底稿</button></h2>
       <div class="chart" id="m1ChartCurve"></div>
     </div>
     <div class="chart-card">
-      <h2>📊 期限利差走势（750）</h2>
+      <h2>📊 期限利差走势（750） <button onclick="exportSpread()" style="float:right;font-size:10px;padding:1px 6px;background:#2e75b6;color:#fff;border:none;border-radius:3px;cursor:pointer">📥底稿</button></h2>
       <div class="chart" id="m1ChartSpread"></div>
     </div>
     <div class="chart-card">
-      <h2>📋 关键期限 vs 750MA 偏离</h2>
+      <h2>📋 关键期限 vs 750MA 偏离 <button onclick="exportKeyTerms()" style="float:right;font-size:10px;padding:1px 6px;background:#2e75b6;color:#fff;border:none;border-radius:3px;cursor:pointer">📥底稿</button></h2>
       <div id="m1TableKey"></div>
     </div>
     <div class="chart-card">
-      <h2>📅 10Y 实际 vs 750MA ±1.96σ</h2>
+      <h2>📅 10Y 实际 vs 750MA ±1.96σ <button onclick="exportHistory()" style="float:right;font-size:10px;padding:1px 6px;background:#2e75b6;color:#fff;border:none;border-radius:3px;cursor:pointer">📥底稿</button></h2>
       <div class="chart" id="m1ChartHistory"></div>
     </div>
     <div class="chart-card">
-      <h2>🔄 不同评估时点750对比</h2>
+      <h2>🔄 不同评估时点750对比 <button onclick="exportComparison()" style="float:right;font-size:10px;padding:1px 6px;background:#2e75b6;color:#fff;border:none;border-radius:3px;cursor:pointer">📥底稿</button></h2>
       <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
         <label style="font-size:12px">选择时点：</label>
         <input type="date" id="m1DateA" style="font-size:12px;padding:2px 4px" onchange="renderMode1Comparison()">
@@ -124,7 +125,7 @@ td.warn{background:#fff3cd}
       <div id="m1CompareTable"></div>
     </div>
     <div class="chart-card">
-      <h2>📈 曲线外推：750MA预测</h2>
+      <h2>📈 曲线外推：750MA预测 <button onclick="exportExtrapolation()" style="float:right;font-size:10px;padding:1px 6px;background:#2e75b6;color:#fff;border:none;border-radius:3px;cursor:pointer">📥底稿</button></h2>
       <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
         <label style="font-size:12px"><input type="radio" name="extrapMethod" value="date" checked onchange="onExtrapMethodChange()"> 基于日期</label>
         <label style="font-size:12px"><input type="radio" name="extrapMethod" value="pivot" onchange="onExtrapMethodChange()"> 基于中枢</label>
@@ -213,6 +214,60 @@ let allData = {};
 let currentMode = 'mode1';
 let currentCurve = 'gov_spot';
 let selectedDate = '';
+
+// ── 导出数据缓存 ──
+let cardData = {};
+
+// ── 通用导出函数 ──
+function exportCard(name, sheetName, columns, rows) {
+  const ws = XLSX.utils.aoa_to_sheet([columns, ...rows]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  XLSX.writeFile(wb, `底稿_${sheetName}.xlsx`);
+}
+
+// ── 各卡片导出函数 ──
+function exportCurve750() {
+  if (!cardData.curve750) return;
+  const c = cardData.curve750;
+  exportCard('curve750', c.sheet, c.cols, c.rows);
+}
+function exportSpread() {
+  if (!cardData.spread) return;
+  const c = cardData.spread;
+  exportCard('spread', c.sheet, c.cols, c.rows);
+}
+function exportKeyTerms() {
+  if (!cardData.keyTerms) return;
+  const c = cardData.keyTerms;
+  exportCard('keyTerms', c.sheet, c.cols, c.rows);
+}
+function exportHistory() {
+  if (!cardData.history) return;
+  const c = cardData.history;
+  exportCard('history', c.sheet, c.cols, c.rows);
+}
+function exportComparison() {
+  // 从当前表格内容实时抓取
+  const table = document.getElementById('m1CompareTable').querySelector('table');
+  if (!table) return;
+  const cols = [], rows = [];
+  table.querySelectorAll('tr').forEach((tr, i) => {
+    const cells = [...tr.querySelectorAll('th,td')].map(td => td.textContent.trim());
+    if (i === 0) cols.push(...cells); else rows.push(cells);
+  });
+  exportCard('comparison', '750对比', cols, rows);
+}
+function exportExtrapolation() {
+  const table = document.getElementById('extrapTable').querySelector('table');
+  if (!table) return;
+  const cols = [], rows = [];
+  table.querySelectorAll('tr').forEach((tr, i) => {
+    const cells = [...tr.querySelectorAll('th,td')].map(td => td.textContent.trim());
+    if (i === 0) cols.push(...cells); else rows.push(cells);
+  });
+  exportCard('extrapolation', '曲线外推', cols, rows);
+}
 
 // ── 模式切换 ──
 function switchMode(mode) {
@@ -371,6 +426,15 @@ function renderMode1(data, row, prevRow, lastMonthRow) {
         { name:'750日均线', type:'line', data: maRow ? terms.map(t=>{const i=data.terms.indexOf(t); return i>=0&&maRow[i]!=null?maRow[i]:null;}) : [], smooth:true, symbol:'diamond', symbolSize:4, lineStyle:{color:'#e67e22',width:2,type:'dashed'}, itemStyle:{color:'#e67e22'} }
       ]
     });
+    // 存储导出数据
+    cardData.curve750 = {
+      sheet: '收益率曲线vs750MA',
+      cols: ['期限','即期利率(%)','750MA(%)'],
+      rows: terms.map(t => {
+        const i = data.terms.indexOf(t);
+        return [t, getTermValue(row,data,t), (maRow && i>=0 && maRow[i]!=null) ? maRow[i] : null];
+      })
+    };
   })();
   
   // 期限利差（基于 750MA）
@@ -427,6 +491,18 @@ function renderMode1(data, row, prevRow, lastMonthRow) {
       yAxis: { type:'value', name:'bp', axisLabel:{formatter:v=>v.toFixed(0)} },
       series
     });
+    // 存储导出数据
+    cardData.spread = {
+      sheet: '期限利差750',
+      cols: ['日期', ...pairs.map(p=>p.name+'(bp)')],
+      rows: displayDates.map((d, idx) => [d, ...pairs.map(p => {
+        const di = findDateIndex(data, d);
+        if (di < 0) return null;
+        const sMA = maCache[p.s] ? maCache[p.s][di] : null;
+        const lMA = maCache[p.l] ? maCache[p.l][di] : null;
+        return (sMA != null && lMA != null) ? +((lMA - sMA) * 100).toFixed(2) : null;
+      })])
+    };
   })();
   
   // 关键期限 vs 750MA
@@ -452,6 +528,20 @@ function renderMode1(data, row, prevRow, lastMonthRow) {
     });
     html += '</table>';
     document.getElementById('m1TableKey').innerHTML = html;
+    // 存储导出数据
+    cardData.keyTerms = {
+      sheet: '关键期限vs750MA',
+      cols: ['期限','所选日(%)','750MA(%)','偏离(bp)','日变动(bp)','月变动(bp)'],
+      rows: terms.map(t => {
+        const v = getTermValue(row, data, t);
+        const ma = maRow ? (()=>{const i=data.terms.indexOf(t); return i>=0&&maRow[i]!=null?maRow[i]:null;})() : null;
+        const pv = getTermValue(prevRow, data, t);
+        const mv = getTermValue(lastMonthRow, data, t);
+        return [t, v, ma, v!=null&&ma!=null?+((v-ma)*100).toFixed(1):null,
+                v!=null&&pv!=null?+((v-pv)*100).toFixed(1):null,
+                v!=null&&mv!=null?+((v-mv)*100).toFixed(1):null];
+      })
+    };
   })();
   
   // 10Y 历史 vs 750MA + 95%置信带（按行情区间着色）
@@ -542,6 +632,12 @@ function renderMode1(data, row, prevRow, lastMonthRow) {
         { name:'750MA', type:'line', data:maValues, symbol:'none', lineStyle:{color:'#e67e22',width:2} }
       ]
     });
+    // 存储导出数据
+    cardData.history = {
+      sheet: '10Y历史vs750MA',
+      cols: ['日期','10Y收益率(%)','750MA(%)','上限+1.96σ(%)','下限-1.96σ(%)'],
+      rows: data.dates.map((d, i) => [d, values[i], maValues[i], upperBand[i], lowerBand[i]])
+    };
   })();
   
   // 初始化时点对比日期选择器
