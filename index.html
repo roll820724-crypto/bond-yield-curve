@@ -276,6 +276,7 @@ async function init() {
   document.getElementById('datePicker').addEventListener('change', refresh);
   
   renderAll();
+  setTimeout(initExtrapDate, 200);
 }
 
 function refresh() {
@@ -694,7 +695,7 @@ function computeExtrapolation() {
   const data = getData(currentCurve);
   if (!data.dates.length) return;
   const selDate = document.getElementById('extrapDate').value;
-  if (!selDate) return;
+  if (!selDate) { document.getElementById('extrapTable').innerHTML = '<p style="font-size:12px;color:#999">请先选择外推日期</p>'; return; }
   const selIdx = findDateIndex(data, selDate);
   if (selIdx < 0) return;
   const selRow = data.rows[selIdx];
