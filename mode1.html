@@ -78,6 +78,7 @@ td.warn{background:#fff3cd}
   <label>基准日：</label>
   <input type="date" id="datePicker">
   <button onclick="refresh()">刷新</button>
+  <button onclick="downloadFullCurve()" style="background:#27ae60">📥 下载全量1-20Y</button>
   <span style="font-size:12px;color:#999;margin-left:8px" id="dateInfo"></span>
 </div>
 
@@ -90,7 +91,7 @@ td.warn{background:#fff3cd}
       <div class="chart" id="m1ChartCurve"></div>
     </div>
     <div class="chart-card">
-      <h2>📊 期限利差走势（750） <button onclick="exportSpread()" style="float:right;font-size:10px;padding:1px 6px;background:#2e75b6;color:#fff;border:none;border-radius:3px;cursor:pointer">📥底稿</button></h2>
+      <h2>📊 期限利差走势（750） <select id="spreadRange" onchange="onSpreadRangeChange()" style="font-size:11px;padding:1px 4px;margin-left:8px"><option value="1y">过去1年</option><option value="3y">过去3年</option><option value="all" selected>全部</option></select> <button onclick="exportSpread()" style="float:right;font-size:10px;padding:1px 6px;background:#2e75b6;color:#fff;border:none;border-radius:3px;cursor:pointer">📥底稿</button></h2>
       <div class="chart" id="m1ChartSpread"></div>
     </div>
     <div class="chart-card">
@@ -116,6 +117,7 @@ td.warn{background:#fff3cd}
       <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
         <label style="font-size:12px"><input type="radio" name="extrapMethod" value="date" checked onchange="onExtrapMethodChange()"> 基于日期</label>
         <label style="font-size:12px"><input type="radio" name="extrapMethod" value="pivot" onchange="onExtrapMethodChange()"> 基于中枢</label>
+        <label style="font-size:12px"><input type="radio" name="extrapMethod" value="spread" onchange="onExtrapMethodChange()"> 基于利差</label>
         <span id="extrapDateArea">
           <label style="font-size:12px;margin-left:4px">日期：</label>
           <input type="date" id="extrapDate" style="font-size:12px;padding:2px 4px">
@@ -123,7 +125,7 @@ td.warn{background:#fff3cd}
         <span id="extrapPivotArea" style="display:none">
           <label style="font-size:12px;margin-left:4px">中枢(%)：</label>
           <input type="number" id="extrapPivot" style="font-size:12px;width:70px;padding:2px 4px" step="0.01" placeholder="如 1.80">
-          <button onclick="findPivotAndCompute()" style="font-size:12px;padding:3px 8px">查找</button>
+          <button id="extrapFindBtn" onclick="findPivotAndCompute()" style="font-size:12px;padding:3px 8px">查找</button>
         </span>
         <button onclick="computeExtrapolation()" style="font-size:12px;padding:3px 10px">计算</button>
       </div>
@@ -154,6 +156,7 @@ const KEY_TERMS = ['1Y','3Y','5Y','7Y','10Y','15Y','20Y','30Y','50Y'];
 let allData = {};
 let currentCurve = 'gov_spot';
 let selectedDate = '';
+let spreadRange = 'all';
 
 // ── 导出数据缓存 ──
 let cardData = {};
@@ -188,12 +191,16 @@ function exportHistory() {
   exportCard('history', c.sheet, c.cols, c.rows);
 }
 function exportComparison() {
-  // 从当前表格内容实时抓取
   const table = document.getElementById('m1CompareTable').querySelector('table');
   if (!table) return;
   const cols = [], rows = [];
   table.querySelectorAll('tr').forEach((tr, i) => {
-    const cells = [...tr.querySelectorAll('th,td')].map(td => td.textContent.trim());
+    const cells = [...tr.querySelectorAll('th,td')].map(td => {
+      const txt = td.textContent.trim();
+      if (txt === '—' || txt === '') return null;
+      const n = parseFloat(txt);
+      return isNaN(n) ? txt : n;
+    });
     if (i === 0) cols.push(...cells); else rows.push(cells);
   });
   exportCard('comparison', '750对比', cols, rows);
@@ -203,10 +210,44 @@ function exportExtrapolation() {
   if (!table) return;
   const cols = [], rows = [];
   table.querySelectorAll('tr').forEach((tr, i) => {
-    const cells = [...tr.querySelectorAll('th,td')].map(td => td.textContent.trim());
+    const cells = [...tr.querySelectorAll('th,td')].map(td => {
+      const txt = td.textContent.trim();
+      if (txt === '—' || txt === '') return null;
+      const n = parseFloat(txt);
+      return isNaN(n) ? txt : n;
+    });
     if (i === 0) cols.push(...cells); else rows.push(cells);
   });
-  exportCard('extrapolation', '曲线外推', cols, rows);
+  const ws = XLSX.utils.aoa_to_sheet([cols, ...rows]);
+  const ws2 = XLSX.utils.aoa_to_sheet([
+    ['项目','说明'],
+    ['方法','假设选定曲线（或利差平移后曲线）在未来每日保持不变，滚动计算750MA'],
+    ['750MA','对每条期限，取过去750个交易日的即期利率算术平均'],
+    ['1-20Y均','1Y至20Y共20个整数期限的750MA等权算术平均'],
+    ['vs 基准','= 该季末1-20Y均 − 对比基准日1-20Y均，单位bp']
+  ]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '曲线外推');
+  XLSX.utils.book_append_sheet(wb, ws2, '计算说明');
+  XLSX.writeFile(wb, '底稿_曲线外推.xlsx');
+}
+
+function downloadFullCurve() {
+  const data = getData(currentCurve);
+  if (!data.dates.length) return;
+  const terms = data.terms.filter(t => { const n = parseInt(t); return n >= 1 && n <= 20; });
+  const cols = ['日期', ...terms];
+  const rows = data.dates.map((d, i) => {
+    const row = data.rows[i];
+    return [d, ...terms.map(t => {
+      const idx = data.terms.indexOf(t);
+      return (idx >= 0 && row[idx] != null) ? +row[idx].toFixed(6) : null;
+    })];
+  });
+  const ws = XLSX.utils.aoa_to_sheet([cols, ...rows]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, CURVE_NAMES[currentCurve]);
+  XLSX.writeFile(wb, `全量利率曲线_${CURVE_NAMES[currentCurve]}.xlsx`);
 }
 
 // ── 工具函数 ──
@@ -386,7 +427,10 @@ function renderMode1(data, row, prevRow, lastMonthRow) {
       maCache[term] = ma;
     });
     
-    const displayDates = allDates.slice(-250);
+    let displayDates;
+    if (spreadRange === '1y') displayDates = allDates.slice(-252);
+    else if (spreadRange === '3y') displayDates = allDates.slice(-756);
+    else displayDates = allDates;
     const series = pairs.map(p => ({
       name: p.name, type: 'line', smooth: true, symbol: 'none',
       data: displayDates.map(d => {
@@ -612,7 +656,7 @@ function renderMode1Comparison() {
   if (!maA || !maB) { container.innerHTML = '<p style="font-size:12px;color:#c0392b">数据不足（需750个交易日）</p>'; return; }
   
   const terms = KEY_TERMS.filter(t => data.terms.includes(t));
-  const avgTerms = ['1Y','3Y','5Y','7Y','10Y','15Y','20Y'];
+  const avgTerms = data.terms.filter(t => { const n = parseInt(t); return n >= 1 && n <= 20; });
   
   let html = `<table><tr><th>期限</th><th>选择时点 ${dateA} 750MA (%)</th><th>参考时点 ${dateB} 750MA (%)</th><th>变动 (bp)</th><th>变动率</th></tr>`;
   
@@ -662,7 +706,13 @@ function renderMode1Comparison() {
 function onExtrapMethodChange() {
   const method = document.querySelector('input[name="extrapMethod"]:checked').value;
   document.getElementById('extrapDateArea').style.display = method === 'date' ? '' : 'none';
-  document.getElementById('extrapPivotArea').style.display = method === 'pivot' ? '' : 'none';
+  document.getElementById('extrapPivotArea').style.display = (method === 'pivot' || method === 'spread') ? '' : 'none';
+  document.getElementById('extrapFindBtn').style.display = method === 'pivot' ? '' : 'none';
+}
+
+function onSpreadRangeChange() {
+  spreadRange = document.getElementById('spreadRange').value;
+  refresh();
 }
 
 function initExtrapDate() {
@@ -735,31 +785,51 @@ function findPivotAndCompute() {
 function computeExtrapolation() {
   const data = getData(currentCurve);
   if (!data.dates.length) return;
-  const selDate = document.getElementById('extrapDate').value;
-  if (!selDate) { document.getElementById('extrapTable').innerHTML = '<p style="font-size:12px;color:#999">请先选择外推日期</p>'; return; }
-  const selIdx = findDateIndex(data, selDate);
-  if (selIdx < 0) return;
-  const selRow = data.rows[selIdx];
+  const method = document.querySelector('input[name="extrapMethod"]:checked').value;
   const lastDate = data.dates[data.dates.length - 1];
+  let selRow, infoLabel;
+
+  if (method === 'spread') {
+    const pivotStr = document.getElementById('extrapPivot').value;
+    if (!pivotStr) { document.getElementById('extrapTable').innerHTML = '<p style="font-size:12px;color:#999">请输入中枢利率</p>'; return; }
+    const pivot = parseFloat(pivotStr);
+    const bDate = document.getElementById('extrapBaseDate').value || lastDate;
+    const bIdx = findDateIndex(data, bDate);
+    if (bIdx < 0) return;
+    const bRow = data.rows[bIdx];
+    const t10i = data.terms.indexOf('10Y');
+    if (t10i < 0 || bRow[t10i] == null) return;
+    const delta = pivot - bRow[t10i];
+    selRow = bRow.map(v => (v != null) ? +(v + delta).toFixed(6) : null);
+    infoLabel = `利差外推：基准曲线=${bDate} 10Y=${(bRow[t10i]*100).toFixed(2)}%，中枢=${pivot.toFixed(2)}%，全线平移${(delta>0?'+':'')+(delta*100).toFixed(1)}bp`;
+  } else {
+    const selDate = document.getElementById('extrapDate').value;
+    if (!selDate) { document.getElementById('extrapTable').innerHTML = '<p style="font-size:12px;color:#999">请先选择外推日期</p>'; return; }
+    const selIdx = findDateIndex(data, selDate);
+    if (selIdx < 0) return;
+    selRow = data.rows[selIdx];
+    infoLabel = `外推曲线 = ${selDate}`;
+  }
+
   const quarterEnds = getNext12QuarterEnds(lastDate);
   const lastQE = quarterEnds[quarterEnds.length - 1];
   const nextDay = new Date(lastDate + 'T00:00:00');
   nextDay.setDate(nextDay.getDate() + 1);
   const futureDates = generateBusinessDays(nextDay.toISOString().slice(0,10), lastQE);
-  
+
   const allDates = [...data.dates, ...futureDates];
   const allRows = [...data.rows];
   for (let i = 0; i < futureDates.length; i++) allRows.push([...selRow]);
-  
+
   const showTerms = ['1Y','3Y','5Y','10Y','20Y'];
-  const avgTermIdx = ['1Y','3Y','5Y','7Y','10Y','15Y','20Y'].map(t => data.terms.indexOf(t)).filter(i => i >= 0);
-  
+  const avgTermIdx = data.terms.filter(t => { const n = parseInt(t); return n >= 1 && n <= 20; }).map(t => data.terms.indexOf(t)).filter(i => i >= 0);
+
   // 对比基准日750MA
   const baseDate = document.getElementById('extrapBaseDate').value || lastDate;
   const baseMA = calc750MA(data, baseDate);
-  
+
   const baseLabel = baseDate === lastDate ? '当前' : baseDate;
-  let html = `<p style="font-size:11px;color:#666;margin-bottom:4px">外推曲线 = ${selDate}，对比基准 = ${baseLabel}，假设未来每日曲线不变</p>`;
+  let html = `<p style="font-size:11px;color:#666;margin-bottom:4px">${infoLabel}，对比基准 = ${baseLabel}，假设未来每日曲线不变</p>`;
   html += `<table><tr><th>季末</th>`;
   showTerms.forEach(t => html += `<th>${t}</th>`);
   html += `<th>1-20Y均</th><th>vs ${baseLabel}(bp)</th></tr>`;
