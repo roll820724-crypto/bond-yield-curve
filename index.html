@@ -420,7 +420,7 @@ function renderMode1(data, row, prevRow, lastMonthRow) {
     document.getElementById('m1TableKey').innerHTML = html;
   })();
   
-  // 10Y 历史 vs 750MA + 95%置信带
+  // 10Y 历史 vs 750MA + 95%置信带（按行情区间着色）
   (function() {
     const dom = document.getElementById('m1ChartHistory');
     const chart = echarts.init(dom);
@@ -430,42 +430,80 @@ function renderMode1(data, row, prevRow, lastMonthRow) {
     const maValues = [];
     const upperBand = [];
     const lowerBand = [];
-    const upperMinusLower = []; // 用于堆积面积着色
-    const window = 250;
+    // 三色面：框内(绿) / 破下限(橙) / 破上限(蓝)
+    const greenLower = [], greenDiff = [];
+    const orangeLower = [], orangeDiff = [];
+    const blueLower = [], blueDiff = [];
+    const win = 250;
     for (let i = 0; i < values.length; i++) {
-      const start = Math.max(0, i - window);
+      const start = Math.max(0, i - win);
       let sum = 0, n = 0;
       for (let j = start; j <= i; j++) { if (values[j] != null) { sum += values[j]; n++; } }
       const ma = n > 0 ? +(sum/n).toFixed(6) : null;
       maValues.push(ma);
+      const v = values[i];
+      let lo = null, hi = null;
       if (n >= 20 && ma != null) {
         let sumSq = 0;
         for (let j = start; j <= i; j++) { if (values[j] != null) sumSq += (values[j] - ma) ** 2; }
         const std = Math.sqrt(sumSq / n);
-        lowerBand.push(+(ma - 1.96 * std).toFixed(6));
-        upperBand.push(+(ma + 1.96 * std).toFixed(6));
-        upperMinusLower.push(+(1.96 * std * 2).toFixed(6));
+        lo = +(ma - 1.96 * std).toFixed(6);
+        hi = +(ma + 1.96 * std).toFixed(6);
+        lowerBand.push(lo); upperBand.push(hi);
       } else {
-        lowerBand.push(null);
-        upperBand.push(null);
-        upperMinusLower.push(null);
+        lowerBand.push(null); upperBand.push(null);
+      }
+      // 三色分段
+      if (v != null && lo != null && hi != null) {
+        const diff = +(hi - lo).toFixed(6);
+        if (v >= lo && v <= hi) {
+          greenLower.push(lo); greenDiff.push(diff);
+          orangeLower.push(null); orangeDiff.push(null);
+          blueLower.push(null); blueDiff.push(null);
+        } else if (v < lo) {
+          greenLower.push(null); greenDiff.push(null);
+          orangeLower.push(lo); orangeDiff.push(diff);
+          blueLower.push(null); blueDiff.push(null);
+        } else {
+          greenLower.push(null); greenDiff.push(null);
+          orangeLower.push(null); orangeDiff.push(null);
+          blueLower.push(lo); blueDiff.push(diff);
+        }
+      } else {
+        greenLower.push(null); greenDiff.push(null);
+        orangeLower.push(null); orangeDiff.push(null);
+        blueLower.push(null); blueDiff.push(null);
       }
     }
     chart.setOption({
       tooltip: { trigger:'axis' },
-      legend: { data:['10Y收益率','750MA','上限 +1.96σ','下限 -1.96σ'], top:5 },
-      grid: { left:50, right:20, top:40, bottom:40 },
+      legend: { data:['10Y收益率','750MA','上限 +1.96σ','下限 -1.96σ',
+        '框内(正常)','破下限(偏贵)','破上限(便宜)'], top:5, textStyle:{fontSize:11} },
+      grid: { left:50, right:20, top:42, bottom:40 },
       xAxis: { type:'category', data: data.dates.map(d=>d.slice(0,7)), axisLabel:{rotate:45,fontSize:9,interval:Math.floor(data.dates.length/12)} },
-      yAxis: { type:'value', name:'%', axisLabel:{formatter:v=>v.toFixed(2)} },
+      yAxis: { type:'value', name:'%', min:1.0, axisLabel:{formatter:v=>v.toFixed(2)} },
       series: [
-        { name:'置信带', type:'line', data:lowerBand, lineStyle:{opacity:0}, symbol:'none', stack:'band',
-          areaStyle:{color:'rgba(230,126,34,0.10)'} },
-        { name:'置信带顶', type:'line', data:upperMinusLower, lineStyle:{opacity:0}, symbol:'none', stack:'band',
-          areaStyle:{color:'rgba(230,126,34,0.10)'} },
+        // 框内 — 浅绿色
+        { name:'框内下', type:'line', data:greenLower, lineStyle:{opacity:0}, symbol:'none', stack:'g',
+          areaStyle:{color:'rgba(39,174,96,0.12)'} },
+        { name:'框内上', type:'line', data:greenDiff, lineStyle:{opacity:0}, symbol:'none', stack:'g',
+          areaStyle:{color:'rgba(39,174,96,0.12)'} },
+        // 破下限 — 浅橙色
+        { name:'破低下', type:'line', data:orangeLower, lineStyle:{opacity:0}, symbol:'none', stack:'o',
+          areaStyle:{color:'rgba(230,126,34,0.18)'} },
+        { name:'破低上', type:'line', data:orangeDiff, lineStyle:{opacity:0}, symbol:'none', stack:'o',
+          areaStyle:{color:'rgba(230,126,34,0.18)'} },
+        // 破上限 — 浅蓝色
+        { name:'破高下', type:'line', data:blueLower, lineStyle:{opacity:0}, symbol:'none', stack:'b',
+          areaStyle:{color:'rgba(46,117,182,0.12)'} },
+        { name:'破高上', type:'line', data:blueDiff, lineStyle:{opacity:0}, symbol:'none', stack:'b',
+          areaStyle:{color:'rgba(46,117,182,0.12)'} },
+        // 边界虚线
         { name:'上限 +1.96σ', type:'line', data:upperBand, symbol:'none',
           lineStyle:{color:'#e74c3c',width:1,type:'dashed'} },
         { name:'下限 -1.96σ', type:'line', data:lowerBand, symbol:'none',
           lineStyle:{color:'#27ae60',width:1,type:'dashed'} },
+        // 主曲线
         { name:'10Y收益率', type:'line', data:values, symbol:'none', lineStyle:{color:'#2e75b6',width:1.5} },
         { name:'750MA', type:'line', data:maValues, symbol:'none', lineStyle:{color:'#e67e22',width:2} }
       ]
