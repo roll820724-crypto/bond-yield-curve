@@ -599,44 +599,54 @@ function renderMode1(data, row, prevRow, lastMonthRow) {
         blueLower.push(null); blueDiff.push(null);
       }
     }
+    // 截断到 2019-06-30（750MA 需约3年完整样本）
+    const cutoffIdx = Math.max(0, data.dates.findIndex(d => d >= '2019-06-30'));
+    const vals2 = values.slice(cutoffIdx);
+    const maV2 = maValues.slice(cutoffIdx);
+    const ub2 = upperBand.slice(cutoffIdx);
+    const lb2 = lowerBand.slice(cutoffIdx);
+    const gl2 = greenLower.slice(cutoffIdx), gd2 = greenDiff.slice(cutoffIdx);
+    const ol2 = orangeLower.slice(cutoffIdx), od2 = orangeDiff.slice(cutoffIdx);
+    const bl2 = blueLower.slice(cutoffIdx), bd2 = blueDiff.slice(cutoffIdx);
+    const xDates = data.dates.slice(cutoffIdx);
     chart.setOption({
       tooltip: { trigger:'axis' },
       legend: { data:['10Y收益率','750MA','上限 +1.96σ','下限 -1.96σ',
         '框内(正常)','破下限(偏贵)','破上限(便宜)'], top:5, textStyle:{fontSize:11} },
       grid: { left:50, right:20, top:42, bottom:40 },
-      xAxis: { type:'category', data: data.dates.map(d=>d.slice(0,7)), axisLabel:{rotate:45,fontSize:9,interval:Math.floor(data.dates.length/12)} },
+      xAxis: { type:'category', data: xDates.map(d=>d.slice(0,7)), axisLabel:{rotate:45,fontSize:9,interval:Math.floor(xDates.length/12)} },
       yAxis: { type:'value', name:'%', min:1.0, axisLabel:{formatter:v=>v.toFixed(2)} },
       series: [
         // 框内 — 浅绿色
-        { name:'框内下', type:'line', data:greenLower, lineStyle:{opacity:0}, symbol:'none', stack:'g',
+        { name:'框内下', type:'line', data:gl2, lineStyle:{opacity:0}, symbol:'none', stack:'g',
           areaStyle:{color:'rgba(39,174,96,0.12)'} },
-        { name:'框内上', type:'line', data:greenDiff, lineStyle:{opacity:0}, symbol:'none', stack:'g',
+        { name:'框内上', type:'line', data:gd2, lineStyle:{opacity:0}, symbol:'none', stack:'g',
           areaStyle:{color:'rgba(39,174,96,0.12)'} },
         // 破下限 — 浅橙色
-        { name:'破低下', type:'line', data:orangeLower, lineStyle:{opacity:0}, symbol:'none', stack:'o',
+        { name:'破低下', type:'line', data:ol2, lineStyle:{opacity:0}, symbol:'none', stack:'o',
           areaStyle:{color:'rgba(230,126,34,0.18)'} },
-        { name:'破低上', type:'line', data:orangeDiff, lineStyle:{opacity:0}, symbol:'none', stack:'o',
+        { name:'破低上', type:'line', data:od2, lineStyle:{opacity:0}, symbol:'none', stack:'o',
           areaStyle:{color:'rgba(230,126,34,0.18)'} },
         // 破上限 — 浅蓝色
-        { name:'破高下', type:'line', data:blueLower, lineStyle:{opacity:0}, symbol:'none', stack:'b',
+        { name:'破高下', type:'line', data:bl2, lineStyle:{opacity:0}, symbol:'none', stack:'b',
           areaStyle:{color:'rgba(46,117,182,0.12)'} },
-        { name:'破高上', type:'line', data:blueDiff, lineStyle:{opacity:0}, symbol:'none', stack:'b',
+        { name:'破高上', type:'line', data:bd2, lineStyle:{opacity:0}, symbol:'none', stack:'b',
           areaStyle:{color:'rgba(46,117,182,0.12)'} },
         // 边界虚线
-        { name:'上限 +1.96σ', type:'line', data:upperBand, symbol:'none',
+        { name:'上限 +1.96σ', type:'line', data:ub2, symbol:'none',
           lineStyle:{color:'#e74c3c',width:1,type:'dashed'} },
-        { name:'下限 -1.96σ', type:'line', data:lowerBand, symbol:'none',
+        { name:'下限 -1.96σ', type:'line', data:lb2, symbol:'none',
           lineStyle:{color:'#27ae60',width:1,type:'dashed'} },
         // 主曲线
-        { name:'10Y收益率', type:'line', data:values, symbol:'none', lineStyle:{color:'#2e75b6',width:1.5} },
-        { name:'750MA', type:'line', data:maValues, symbol:'none', lineStyle:{color:'#e67e22',width:2} }
+        { name:'10Y收益率', type:'line', data:vals2, symbol:'none', lineStyle:{color:'#2e75b6',width:1.5} },
+        { name:'750MA', type:'line', data:maV2, symbol:'none', lineStyle:{color:'#e67e22',width:2} }
       ]
     });
     // 存储导出数据
     cardData.history = {
       sheet: '10Y历史vs750MA',
       cols: ['日期','10Y收益率(%)','750MA(%)','上限+1.96σ(%)','下限-1.96σ(%)'],
-      rows: data.dates.map((d, i) => [d, values[i], maValues[i], upperBand[i], lowerBand[i]])
+      rows: xDates.map((d, i) => [d, vals2[i], maV2[i], ub2[i], lb2[i]])
     };
   })();
   
