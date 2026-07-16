@@ -117,9 +117,9 @@ td.warn{background:#fff3cd}
       <h2>🔄 不同评估时点750对比</h2>
       <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
         <label style="font-size:12px">选择时点：</label>
-        <select id="m1DateA" style="font-size:12px;padding:3px 6px" onchange="renderMode1Comparison()"></select>
+        <input type="date" id="m1DateA" style="font-size:12px;padding:2px 4px" onchange="renderMode1Comparison()">
         <label style="font-size:12px;margin-left:8px">参考时点：</label>
-        <select id="m1DateB" style="font-size:12px;padding:3px 6px" onchange="renderMode1Comparison()"></select>
+        <input type="date" id="m1DateB" style="font-size:12px;padding:2px 4px" onchange="renderMode1Comparison()">
       </div>
       <div id="m1CompareTable"></div>
     </div>
@@ -544,21 +544,20 @@ function renderMode1(data, row, prevRow, lastMonthRow) {
     });
   })();
   
-  // 初始化时点对比下拉框
+  // 初始化时点对比日期选择器
   (function() {
-    const selA = document.getElementById('m1DateA');
-    const selB = document.getElementById('m1DateB');
-    if (!selA || !selB) return;
-    if (selA.options.length > 0) return;
+    const inpA = document.getElementById('m1DateA');
+    const inpB = document.getElementById('m1DateB');
+    if (!inpA || !inpB) return;
+    if (inpA.value) return;
     const dates = data.dates;
-    dates.forEach(d => {
-      selA.add(new Option(d, d));
-      selB.add(new Option(d, d));
-    });
+    const first = dates[0];
     const latest = dates[dates.length - 1];
     const yearAgo = dates[Math.max(0, dates.length - 251)];
-    selA.value = latest;
-    selB.value = yearAgo;
+    inpA.min = first; inpA.max = latest;
+    inpB.min = first; inpB.max = latest;
+    inpA.value = latest;
+    inpB.value = yearAgo;
     renderMode1Comparison();
     initExtrapDate();
   })();
