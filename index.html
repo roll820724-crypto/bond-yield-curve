@@ -113,6 +113,16 @@ td.warn{background:#fff3cd}
       <h2>📅 10Y 实际 vs 750MA ±1.96σ</h2>
       <div class="chart" id="m1ChartHistory"></div>
     </div>
+    <div class="chart-card">
+      <h2>🔄 不同评估时点750对比</h2>
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
+        <label style="font-size:12px">时点A：</label>
+        <select id="m1DateA" style="font-size:12px;padding:3px 6px" onchange="renderMode1Comparison()"></select>
+        <label style="font-size:12px;margin-left:8px">时点B：</label>
+        <select id="m1DateB" style="font-size:12px;padding:3px 6px" onchange="renderMode1Comparison()"></select>
+      </div>
+      <div id="m1CompareTable"></div>
+    </div>
   </div>
 </div>
 
@@ -214,7 +224,7 @@ function calc750MA(data, targetDate) {
   if (targetIdx < 0) return null;
   const terms = data.terms;
   const ma = new Array(terms.length).fill(null);
-  const startIdx = Math.max(0, targetIdx - 250);
+  const startIdx = Math.max(0, targetIdx - 750);
   const count = targetIdx - startIdx + 1;
   if (count < 20) return ma;
   for (let j = 0; j < terms.length; j++) {
@@ -509,6 +519,84 @@ function renderMode1(data, row, prevRow, lastMonthRow) {
       ]
     });
   })();
+  
+  // 初始化时点对比下拉框
+  (function() {
+    const selA = document.getElementById('m1DateA');
+    const selB = document.getElementById('m1DateB');
+    if (!selA || !selB) return;
+    if (selA.options.length > 0) return;
+    const dates = data.dates;
+    dates.forEach(d => {
+      selA.add(new Option(d, d));
+      selB.add(new Option(d, d));
+    });
+    const latest = dates[dates.length - 1];
+    const yearAgo = dates[Math.max(0, dates.length - 251)];
+    selA.value = latest;
+    selB.value = yearAgo;
+    renderMode1Comparison();
+  })();
+}
+
+// 时点对比表格
+function renderMode1Comparison() {
+  const selA = document.getElementById('m1DateA');
+  const selB = document.getElementById('m1DateB');
+  const container = document.getElementById('m1CompareTable');
+  if (!selA || !selB || !container) return;
+  
+  const dateA = selA.value;
+  const dateB = selB.value;
+  if (!dateA || !dateB) { container.innerHTML = '<p style="font-size:12px;color:#999">请选择两个时点</p>'; return; }
+  
+  const data = getData(currentCurve);
+  const maA = calc750MA(data, dateA);
+  const maB = calc750MA(data, dateB);
+  if (!maA || !maB) { container.innerHTML = '<p style="font-size:12px;color:#c0392b">数据不足（需750个交易日）</p>'; return; }
+  
+  const terms = KEY_TERMS.filter(t => data.terms.includes(t));
+  const avgTerms = ['1Y','3Y','5Y','7Y','10Y','15Y','20Y'];
+  
+  let html = `<table><tr><th>期限</th><th>${dateA} 750MA (%)</th><th>${dateB} 750MA (%)</th><th>变动 (bp)</th><th>变动率</th></tr>`;
+  
+  terms.forEach(t => {
+    const i = data.terms.indexOf(t);
+    const a = i >= 0 ? maA[i] : null;
+    const b = i >= 0 ? maB[i] : null;
+    const diff = (a != null && b != null) ? (b - a) * 100 : null;
+    const rate = (a != null && b != null && a !== 0) ? ((b - a) / a * 100) : null;
+    html += `<tr>
+      <td style="font-weight:600">${t}</td>
+      <td>${a != null ? a.toFixed(4) : '—'}</td>
+      <td>${b != null ? b.toFixed(4) : '—'}</td>
+      <td class="${diff>0?'up':diff<0?'down':''}">${diff != null ? (diff>0?'+':'')+diff.toFixed(1) : '—'}</td>
+      <td class="${rate>0?'up':rate<0?'down':''}">${rate != null ? (rate>0?'+':'')+rate.toFixed(2)+'%' : '—'}</td>
+    </tr>`;
+  });
+  
+  const avgA = (() => {
+    let sum = 0, n = 0;
+    avgTerms.forEach(t => { const i = data.terms.indexOf(t); if (i >= 0 && maA[i] != null) { sum += maA[i]; n++; } });
+    return n > 0 ? +(sum / n).toFixed(6) : null;
+  })();
+  const avgB = (() => {
+    let sum = 0, n = 0;
+    avgTerms.forEach(t => { const i = data.terms.indexOf(t); if (i >= 0 && maB[i] != null) { sum += maB[i]; n++; } });
+    return n > 0 ? +(sum / n).toFixed(6) : null;
+  })();
+  const avgDiff = (avgA != null && avgB != null) ? (avgB - avgA) * 100 : null;
+  const avgRate = (avgA != null && avgB != null && avgA !== 0) ? ((avgB - avgA) / avgA * 100) : null;
+  html += `<tr style="background:#f0f5fb;font-weight:600">
+    <td>1-20Y 平均</td>
+    <td>${avgA != null ? avgA.toFixed(4) : '—'}</td>
+    <td>${avgB != null ? avgB.toFixed(4) : '—'}</td>
+    <td class="${avgDiff>0?'up':avgDiff<0?'down':''}">${avgDiff != null ? (avgDiff>0?'+':'')+avgDiff.toFixed(1) : '—'}</td>
+    <td class="${avgRate>0?'up':avgRate<0?'down':''}">${avgRate != null ? (avgRate>0?'+':'')+avgRate.toFixed(2)+'%' : '—'}</td>
+  </tr>`;
+  
+  html += '</table>';
+  container.innerHTML = html;
 }
 
 // ═══════════════════════════════════════════════
