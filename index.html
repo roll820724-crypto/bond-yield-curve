@@ -672,7 +672,7 @@ function getNext12QuarterEnds(fromStr) {
 function findPivotAndCompute() {
   const pivotStr = document.getElementById('extrapPivot').value;
   if (!pivotStr) return;
-  const pivot = parseFloat(pivotStr) / 100;
+  const pivot = parseFloat(pivotStr);
   const data = getData(currentCurve);
   const t10 = data.terms.indexOf('10Y');
   if (t10 < 0) return;
