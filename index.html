@@ -298,16 +298,17 @@ function renderAll() {
 function renderMode1(data, row, prevRow, lastMonthRow) {
   const maRow = calc750MA(data, selectedDate);
   
-  // 汇总卡片
+  // 汇总卡片（基于 750MA）
   const cards = ['10Y','5Y','1Y','1Y-10Y'].map(k => {
     let val, change;
     if (k === '1Y-10Y') {
-      const y1 = getTermValue(row, data, '1Y'), y10 = getTermValue(row, data, '10Y');
-      val = (y1!=null && y10!=null) ? +(y10 - y1).toFixed(4) : null;
-      const y1p = getTermValue(prevRow, data, '1Y'), y10p = getTermValue(prevRow, data, '10Y');
-      const ps = (y1p!=null && y10p!=null) ? +(y10p - y1p).toFixed(4) : null;
-      change = (val != null && ps != null) ? +(val - ps).toFixed(4) : null;
-      return {label:'1Y-10Y 利差', val: val!=null ? (val*100).toFixed(0)+'bp' : '—', change};
+      // 基于 750MA 的利差
+      const idx1 = data.terms.indexOf('1Y'), idx10 = data.terms.indexOf('10Y');
+      const y1MA = (idx1>=0 && maRow[idx1]!=null) ? maRow[idx1] : null;
+      const y10MA = (idx10>=0 && maRow[idx10]!=null) ? maRow[idx10] : null;
+      val = (y1MA!=null && y10MA!=null) ? +(y10MA - y1MA).toFixed(4) : null;
+      change = null; // 750MA 利差日变动意义不大
+      return {label:'1Y-10Y 利差(750MA)', val: val!=null ? (val*100).toFixed(0)+'bp' : '—', change};
     }
     val = getTermValue(row, data, k);
     const pv = getTermValue(prevRow, data, k);
@@ -338,25 +339,49 @@ function renderMode1(data, row, prevRow, lastMonthRow) {
     });
   })();
   
-  // 期限利差
+  // 期限利差（基于 750MA）
   (function() {
     const dom = document.getElementById('m1ChartSpread');
     const chart = echarts.init(dom);
     const pairs = [{name:'10Y-1Y',s:'1Y',l:'10Y'},{name:'30Y-10Y',s:'10Y',l:'30Y'},{name:'5Y-1Y',s:'1Y',l:'5Y'}];
-    const dates = data.dates.slice(-250);
+    
+    // 预计算各期限 750MA 序列
+    const allDates = data.dates;
+    const maCache = {};
+    [pairs[0].s, pairs[0].l, pairs[1].l, pairs[2].l].filter((v,i,a)=>a.indexOf(v)===i).forEach(term => {
+      const termIdx = data.terms.indexOf(term);
+      if (termIdx < 0) return;
+      const vals = data.rows.map(r => r[termIdx]);
+      const ma = [];
+      for (let i = 0; i < vals.length; i++) {
+        const start = Math.max(0, i - 250);
+        let sum = 0, n = 0;
+        for (let j = start; j <= i; j++) { if (vals[j] != null) { sum += vals[j]; n++; } }
+        ma.push(n > 0 ? +(sum/n).toFixed(6) : null);
+      }
+      maCache[term] = ma;
+    });
+    
+    const displayDates = allDates.slice(-250);
     const series = pairs.map(p => ({
       name: p.name, type: 'line', smooth: true, symbol: 'none',
-      data: dates.map(d => {
-        const r = getRow(data, d); if (!r) return null;
-        const s = getTermValue(r, data, p.s), l = getTermValue(r, data, p.l);
-        return (s!=null && l!=null) ? +((l-s)*100).toFixed(2) : null;
+      data: displayDates.map(d => {
+        const idx = findDateIndex(data, d);
+        if (idx < 0) return null;
+        const sMA = maCache[p.s] ? maCache[p.s][idx] : null;
+        const lMA = maCache[p.l] ? maCache[p.l][idx] : null;
+        return (sMA != null && lMA != null) ? +((lMA - sMA) * 100).toFixed(2) : null;
       })
     }));
+    
+    // 所选日 MA 利差标注
     let spreadText = '';
-    if (row) {
+    const selIdx = findDateIndex(data, selectedDate);
+    if (selIdx >= 0) {
       spreadText = pairs.map(p => {
-        const s = getTermValue(row, data, p.s), l = getTermValue(row, data, p.l);
-        return (s!=null && l!=null) ? `${p.name}: ${((l-s)*100).toFixed(1)}bp` : '';
+        const sMA = maCache[p.s] ? maCache[p.s][selIdx] : null;
+        const lMA = maCache[p.l] ? maCache[p.l][selIdx] : null;
+        return (sMA != null && lMA != null) ? `${p.name}: ${((lMA - sMA) * 100).toFixed(1)}bp` : '';
       }).filter(Boolean).join('  ');
     }
     chart.setOption({
@@ -364,7 +389,7 @@ function renderMode1(data, row, prevRow, lastMonthRow) {
       legend: { data: pairs.map(p=>p.name), top: 0 },
       grid: { left: 50, right: 20, top: 50, bottom: 40 },
       graphic: spreadText ? [{ type:'text', right:20, top:28, style:{text:spreadText,fontSize:12,fill:'#333',fontWeight:'bold'} }] : [],
-      xAxis: { type:'category', data: dates.map(d=>d.slice(5)), axisLabel:{rotate:45,fontSize:10} },
+      xAxis: { type:'category', data: displayDates.map(d=>d.slice(5)), axisLabel:{rotate:45,fontSize:10} },
       yAxis: { type:'value', name:'bp', axisLabel:{formatter:v=>v.toFixed(0)} },
       series
     });
