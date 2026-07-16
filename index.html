@@ -116,9 +116,9 @@ td.warn{background:#fff3cd}
     <div class="chart-card">
       <h2>🔄 不同评估时点750对比</h2>
       <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
-        <label style="font-size:12px">时点A：</label>
+        <label style="font-size:12px">选择时点：</label>
         <select id="m1DateA" style="font-size:12px;padding:3px 6px" onchange="renderMode1Comparison()"></select>
-        <label style="font-size:12px;margin-left:8px">时点B：</label>
+        <label style="font-size:12px;margin-left:8px">参考时点：</label>
         <select id="m1DateB" style="font-size:12px;padding:3px 6px" onchange="renderMode1Comparison()"></select>
       </div>
       <div id="m1CompareTable"></div>
@@ -558,14 +558,14 @@ function renderMode1Comparison() {
   const terms = KEY_TERMS.filter(t => data.terms.includes(t));
   const avgTerms = ['1Y','3Y','5Y','7Y','10Y','15Y','20Y'];
   
-  let html = `<table><tr><th>期限</th><th>${dateA} 750MA (%)</th><th>${dateB} 750MA (%)</th><th>变动 (bp)</th><th>变动率</th></tr>`;
+  let html = `<table><tr><th>期限</th><th>选择时点 ${dateA} 750MA (%)</th><th>参考时点 ${dateB} 750MA (%)</th><th>变动 (bp)</th><th>变动率</th></tr>`;
   
   terms.forEach(t => {
     const i = data.terms.indexOf(t);
     const a = i >= 0 ? maA[i] : null;
     const b = i >= 0 ? maB[i] : null;
-    const diff = (a != null && b != null) ? (b - a) * 100 : null;
-    const rate = (a != null && b != null && a !== 0) ? ((b - a) / a * 100) : null;
+    const diff = (a != null && b != null) ? (a - b) * 100 : null;
+    const rate = (a != null && b != null && b !== 0) ? ((a - b) / b * 100) : null;
     html += `<tr>
       <td style="font-weight:600">${t}</td>
       <td>${a != null ? a.toFixed(4) : '—'}</td>
@@ -585,8 +585,8 @@ function renderMode1Comparison() {
     avgTerms.forEach(t => { const i = data.terms.indexOf(t); if (i >= 0 && maB[i] != null) { sum += maB[i]; n++; } });
     return n > 0 ? +(sum / n).toFixed(6) : null;
   })();
-  const avgDiff = (avgA != null && avgB != null) ? (avgB - avgA) * 100 : null;
-  const avgRate = (avgA != null && avgB != null && avgA !== 0) ? ((avgB - avgA) / avgA * 100) : null;
+  const avgDiff = (avgA != null && avgB != null) ? (avgA - avgB) * 100 : null;
+  const avgRate = (avgA != null && avgB != null && avgB !== 0) ? ((avgA - avgB) / avgB * 100) : null;
   html += `<tr style="background:#f0f5fb;font-weight:600">
     <td>1-20Y 平均</td>
     <td>${avgA != null ? avgA.toFixed(4) : '—'}</td>
