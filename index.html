@@ -110,7 +110,7 @@ td.warn{background:#fff3cd}
       <div id="m1TableKey"></div>
     </div>
     <div class="chart-card">
-      <h2>📅 10Y 实际 vs 750MA 历史走势</h2>
+      <h2>📅 10Y 实际 vs 750MA ±1.96σ</h2>
       <div class="chart" id="m1ChartHistory"></div>
     </div>
   </div>
@@ -420,7 +420,7 @@ function renderMode1(data, row, prevRow, lastMonthRow) {
     document.getElementById('m1TableKey').innerHTML = html;
   })();
   
-  // 10Y 历史 vs 750MA
+  // 10Y 历史 vs 750MA + 95%置信带
   (function() {
     const dom = document.getElementById('m1ChartHistory');
     const chart = echarts.init(dom);
@@ -428,19 +428,44 @@ function renderMode1(data, row, prevRow, lastMonthRow) {
     if (term10Idx < 0) return;
     const values = data.rows.map(r => r[term10Idx]);
     const maValues = [];
+    const upperBand = [];
+    const lowerBand = [];
+    const upperMinusLower = []; // 用于堆积面积着色
+    const window = 250;
     for (let i = 0; i < values.length; i++) {
-      const start = Math.max(0, i - 250);
+      const start = Math.max(0, i - window);
       let sum = 0, n = 0;
       for (let j = start; j <= i; j++) { if (values[j] != null) { sum += values[j]; n++; } }
-      maValues.push(n > 0 ? +(sum/n).toFixed(4) : null);
+      const ma = n > 0 ? +(sum/n).toFixed(6) : null;
+      maValues.push(ma);
+      if (n >= 20 && ma != null) {
+        let sumSq = 0;
+        for (let j = start; j <= i; j++) { if (values[j] != null) sumSq += (values[j] - ma) ** 2; }
+        const std = Math.sqrt(sumSq / n);
+        lowerBand.push(+(ma - 1.96 * std).toFixed(6));
+        upperBand.push(+(ma + 1.96 * std).toFixed(6));
+        upperMinusLower.push(+(1.96 * std * 2).toFixed(6));
+      } else {
+        lowerBand.push(null);
+        upperBand.push(null);
+        upperMinusLower.push(null);
+      }
     }
     chart.setOption({
       tooltip: { trigger:'axis' },
-      legend: { data:['10Y收益率','750MA'], top:5 },
+      legend: { data:['10Y收益率','750MA','上限 +1.96σ','下限 -1.96σ'], top:5 },
       grid: { left:50, right:20, top:40, bottom:40 },
       xAxis: { type:'category', data: data.dates.map(d=>d.slice(0,7)), axisLabel:{rotate:45,fontSize:9,interval:Math.floor(data.dates.length/12)} },
       yAxis: { type:'value', name:'%', axisLabel:{formatter:v=>v.toFixed(2)} },
       series: [
+        { name:'置信带', type:'line', data:lowerBand, lineStyle:{opacity:0}, symbol:'none', stack:'band',
+          areaStyle:{color:'rgba(230,126,34,0.10)'} },
+        { name:'置信带顶', type:'line', data:upperMinusLower, lineStyle:{opacity:0}, symbol:'none', stack:'band',
+          areaStyle:{color:'rgba(230,126,34,0.10)'} },
+        { name:'上限 +1.96σ', type:'line', data:upperBand, symbol:'none',
+          lineStyle:{color:'#e74c3c',width:1,type:'dashed'} },
+        { name:'下限 -1.96σ', type:'line', data:lowerBand, symbol:'none',
+          lineStyle:{color:'#27ae60',width:1,type:'dashed'} },
         { name:'10Y收益率', type:'line', data:values, symbol:'none', lineStyle:{color:'#2e75b6',width:1.5} },
         { name:'750MA', type:'line', data:maValues, symbol:'none', lineStyle:{color:'#e67e22',width:2} }
       ]
