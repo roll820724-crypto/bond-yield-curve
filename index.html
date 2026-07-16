@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>利率曲线监测及分析报告</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Microsoft YaHei',sans-serif;background:#f0f2f5;color:#333;padding:20px}
+.header{text-align:center;padding:24px 0 16px}
+.header h1{font-size:26px;color:#1a3c6e;margin-bottom:4px}
+.header .sub{font-size:13px;color:#888}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(520px,1fr));gap:16px;max-width:1400px;margin:0 auto}
+.card{background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.08);padding:16px 20px}
+.card h2{font-size:15px;color:#1a3c6e;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid #2e75b6}
+.chart{width:100%;height:360px}
+.toolbar{max-width:1400px;margin:0 auto 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;background:#fff;padding:12px 20px;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.toolbar label{font-size:13px;color:#666;white-space:nowrap}
+.toolbar select,.toolbar input{font-size:13px;padding:4px 8px;border:1px solid #ddd;border-radius:4px}
+.toolbar button{font-size:13px;padding:5px 14px;background:#2e75b6;color:#fff;border:none;border-radius:4px;cursor:pointer}
+.toolbar button:hover{background:#1a3c6e}
+table{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}
+th,td{padding:5px 8px;text-align:center;border:1px solid #e8e8e8}
+th{background:#f5f7fa;color:#555;font-weight:600}
+td.up{color:#c0392b}
+td.down{color:#27ae60}
+.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;max-width:1400px;margin:0 auto 16px}
+.summary-card{background:#fff;border-radius:8px;padding:12px 16px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.summary-card .title{font-size:13px;color:#888;margin-bottom:4px}
+.summary-card .value{font-size:24px;font-weight:700;color:#1a3c6e}
+.summary-card .change{font-size:12px;margin-top:2px}
+.footer{text-align:center;padding:20px;color:#aaa;font-size:12px}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>📈 利率曲线监测及分析报告</h1>
+  <div class="sub" id="updateTime">数据加载中...</div>
+</div>
+
+<div class="toolbar">
+  <label>曲线：</label>
+  <select id="curveSelect">
+    <option value="gov_spot">国债即期</option>
+    <option value="cdb_spot">国开债即期</option>
+    <option value="gov_ytm">国债到期</option>
+    <option value="cdb_ytm">国开债到期</option>
+  </select>
+  <label>基准日：</label>
+  <input type="date" id="datePicker">
+  <button onclick="refresh()">刷新</button>
+  <span style="font-size:12px;color:#999;margin-left:8px" id="dateInfo"></span>
+</div>
+
+<div class="summary-grid" id="summaryCards"></div>
+
+<div class="grid">
+  <div class="card">
+    <h2>📉 收益率曲线</h2>
+    <div class="chart" id="chartCurve"></div>
+  </div>
+  <div class="card">
+    <h2>📊 期限利差</h2>
+    <div class="chart" id="chartSpread"></div>
+  </div>
+  <div class="card">
+    <h2>📋 关键期限明细（基准日 vs 750MA）</h2>
+    <div id="tableKey"></div>
+  </div>
+  <div class="card">
+    <h2>📅 历史走势（10年期）</h2>
+    <div class="chart" id="chartHistory"></div>
+  </div>
+</div>
+
+<div class="footer">数据来源：中国债券信息网 (yield.chinabond.com.cn) ｜ 自动更新于每日17:30</div>
+
+<script>
+// ============ 数据加载 ============
+const DATA_FILES = {
+  gov_spot: 'data.json',
+  cdb_spot: 'data_cdb.json',
+  gov_ytm: 'data_gov_ytm.json',
+  cdb_ytm: 'data_cdb_ytm.json'
+};
+const CURVE_NAMES = { gov_spot:'国债即期', cdb_spot:'国开债即期', gov_ytm:'国债到期', cdb_ytm:'国开债到期' };
+const KEY_TERMS = ['1Y','3Y','5Y','7Y','10Y','15Y','20Y','30Y','50Y'];
+let allData = {};
+let currentCurve = 'gov_spot';
+let selectedDate = '';
+
+// ============ 初始化 ============
+async function init() {
+  // 并行加载四条曲线
+  const promises = Object.entries(DATA_FILES).map(async ([key, file]) => {
+    try {
+      const resp = await fetch(file);
+      allData[key] = await resp.json();
+    } catch(e) {
+      console.warn(`加载 ${file} 失败:`, e);
+    }
+  });
+  await Promise.all(promises);
+  
+  // 设置默认日期为最新
+  if (allData.gov_spot && allData.gov_spot.dates.length > 0) {
+    selectedDate = allData.gov_spot.dates[allData.gov_spot.dates.length - 1];
+    document.getElementById('datePicker').value = selectedDate;
+  }
+  
+  document.getElementById('updateTime').textContent = 
+    `数据更新至 ${selectedDate} ｜ 自动抓取自中国债券信息网`;
+  
+  document.getElementById('curveSelect').addEventListener('change', refresh);
+  document.getElementById('datePicker').addEventListener('change', refresh);
+  
+  refresh();
+}
+
+function refresh() {
+  currentCurve = document.getElementById('curveSelect').value;
+  selectedDate = document.getElementById('datePicker').value;
+  if (!selectedDate && allData[currentCurve]) {
+    selectedDate = allData[currentCurve].dates[allData[currentCurve].dates.length - 1];
+    document.getElementById('datePicker').value = selectedDate;
+  }
+  renderAll();
+}
+
+// ============ 工具函数 ============
+function getData(curveKey) {
+  return allData[curveKey] || { dates:[], terms:[], rows:[] };
+}
+
+function findDateIndex(data, date) {
+  return data.dates.indexOf(date);
+}
+
+function getRow(data, date) {
+  const idx = findDateIndex(data, date);
+  return idx >= 0 ? data.rows[idx] : null;
+}
+
+function calc750MA(data, targetDate) {
+  const targetIdx = findDateIndex(data, targetDate);
+  if (targetIdx < 0) return null;
+  
+  // 取最近750个日历天的交易日（约250个）
+  const terms = data.terms;
+  const ma = new Array(terms.length).fill(null);
+  const startIdx = Math.max(0, targetIdx - 250);
+  const count = targetIdx - startIdx + 1;
+  
+  if (count < 20) return ma;
+  
+  for (let j = 0; j < terms.length; j++) {
+    let sum = 0, n = 0;
+    for (let i = startIdx; i <= targetIdx; i++) {
+      const v = data.rows[i][j];
+      if (v != null) { sum += v; n++; }
+    }
+    if (n > 0) ma[j] = +(sum / n).toFixed(6);
+  }
+  return ma;
+}
+
+function getTermValue(row, data, term) {
+  const idx = data.terms.indexOf(term);
+  return idx >= 0 && row ? row[idx] : null;
+}
+
+function fmtBP(v) {
+  if (v == null) return '—';
+  const bp = (v * 100).toFixed(1);
+  const cls = v > 0 ? 'up' : v < 0 ? 'down' : '';
+  return `<span class="${cls}">${v > 0 ? '+' : ''}${bp} bp</span>`;
+}
+
+function fmtPct(v) {
+  if (v == null) return '—';
+  return (v * 100).toFixed(4) + '%';
+}
+
+// ============ 渲染 ============
+function renderAll() {
+  const data = getData(currentCurve);
+  if (!data.dates.length) return;
+  
+  const row = getRow(data, selectedDate);
+  const maRow = calc750MA(data, selectedDate);
+  const dateIdx = findDateIndex(data, selectedDate);
+  
+  // 前一个交易日
+  let prevRow = null, prevDate = '';
+  if (dateIdx > 0) {
+    prevDate = data.dates[dateIdx - 1];
+    prevRow = data.rows[dateIdx - 1];
+  }
+  
+  // 上月末
+  const sd = new Date(selectedDate);
+  let lastMonthDate = '', lastMonthRow = null;
+  for (let i = dateIdx; i >= 0; i--) {
+    const d = new Date(data.dates[i]);
+    if (d.getMonth() !== sd.getMonth() || d.getFullYear() !== sd.getFullYear()) {
+      lastMonthDate = data.dates[i];
+      lastMonthRow = data.rows[i];
+      break;
+    }
+  }
+  
+  document.getElementById('dateInfo').textContent = 
+    `共 ${data.dates.length} 个交易日 ｜ ${data.dates[0]} ~ ${data.dates[data.dates.length-1]}`;
+  
+  renderSummary(data, row, maRow, prevRow);
+  renderCurveChart(data, row, maRow);
+  renderSpreadChart(data);
+  renderKeyTable(data, row, maRow, prevRow, lastMonthDate, lastMonthRow);
+  renderHistoryChart(data);
+}
+
+function renderSummary(data, row, maRow, prevRow) {
+  if (!row) return;
+  const html = ['10Y','5Y','1Y','1Y-10Y'].map(k => {
+    let val = null, change = null;
+    if (k === '1Y-10Y') {
+      const y1 = getTermValue(row, data, '1Y');
+      const y10 = getTermValue(row, data, '10Y');
+      val = (y1 != null && y10 != null) ? +(y10 - y1).toFixed(4) : null;
+      const y1p = getTermValue(prevRow, data, '1Y');
+      const y10p = getTermValue(prevRow, data, '10Y');
+      const prevSpread = (y1p != null && y10p != null) ? +(y10p - y1p).toFixed(4) : null;
+      change = (val != null && prevSpread != null) ? +(val - prevSpread).toFixed(4) : null;
+      return { label: '1Y-10Y 利差', val: (val*100).toFixed(0)+'bp', change };
+    } else {
+      val = getTermValue(row, data, k);
+      const prevVal = getTermValue(prevRow, data, k);
+      change = (val != null && prevVal != null) ? +(val - prevVal).toFixed(4) : null;
+      return { label: `${k} 收益率`, val: val != null ? val.toFixed(4)+'%' : '—', change };
+    }
+  }).map(x => {
+    const chgCls = x.change > 0 ? 'up' : x.change < 0 ? 'down' : '';
+    const chgStr = x.change != null ? `<span class="change ${chgCls}">${x.change>0?'+':''}${(x.change*100).toFixed(1)}bp</span>` : '';
+    return `<div class="summary-card"><div class="title">${x.label}</div><div class="value">${x.val}</div>${chgStr}</div>`;
+  }).join('');
+  document.getElementById('summaryCards').innerHTML = html;
+}
+
+function renderCurveChart(data, row, maRow) {
+  const dom = document.getElementById('chartCurve');
+  const chart = echarts.init(dom);
+  const terms = data.terms.filter(t => row && getTermValue(row, data, t) != null);
+  const labels = terms.map(t => t.replace('Y',''));
+  const values = terms.map(t => getTermValue(row, data, t));
+  const maValues = maRow ? terms.map(t => {
+    const idx = data.terms.indexOf(t);
+    return idx >= 0 && maRow[idx] != null ? maRow[idx] : null;
+  }) : [];
+  
+  chart.setOption({
+    tooltip: { trigger: 'axis', formatter: p => {
+      let s = `${p[0].axisValue}年<br/>`;
+      p.forEach(x => { if(x.value!=null) s += `${x.marker} ${x.seriesName}: ${x.value.toFixed(4)}%<br/>`; });
+      return s;
+    }},
+    legend: { data: ['即期利率','750日均线'], top: 5 },
+    grid: { left: 50, right: 20, top: 40, bottom: 25 },
+    xAxis: { type: 'category', data: labels, name: '期限(年)', nameLocation:'center', nameGap:25 },
+    yAxis: { type: 'value', name: '%', axisLabel: { formatter: v => v.toFixed(1) } },
+    series: [
+      { name: '即期利率', type: 'line', data: values, smooth: true, symbol: 'circle', symbolSize: 5,
+        lineStyle: { color: '#2e75b6', width: 2.5 }, itemStyle: { color: '#2e75b6' } },
+      { name: '750日均线', type: 'line', data: maValues, smooth: true, symbol: 'diamond', symbolSize: 4,
+        lineStyle: { color: '#e67e22', width: 2, type: 'dashed' }, itemStyle: { color: '#e67e22' } }
+    ]
+  });
+}
+
+function renderSpreadChart(data) {
+  const dom = document.getElementById('chartSpread');
+  const chart = echarts.init(dom);
+  const spreadPairs = [
+    { name: '10Y-1Y', short: '1Y', long: '10Y' },
+    { name: '30Y-10Y', short: '10Y', long: '30Y' },
+    { name: '5Y-1Y', short: '1Y', long: '5Y' },
+  ];
+  
+  const dates = data.dates.slice(-250);
+  const series = spreadPairs.map(pair => {
+    const vals = dates.map(d => {
+      const idx = findDateIndex(data, d);
+      if (idx < 0) return null;
+      const r = data.rows[idx];
+      const s = getTermValue(r, data, pair.short);
+      const l = getTermValue(r, data, pair.long);
+      return (s != null && l != null) ? +((l - s) * 100).toFixed(2) : null;
+    });
+    return { name: pair.name, type: 'line', data: vals, smooth: true, symbol: 'none' };
+  });
+  
+  // 基准日利差数值
+  const curIdx2 = findDateIndex(data, selectedDate);
+  let spreadText = '';
+  if (curIdx2 >= 0) {
+    const cr = data.rows[curIdx2];
+    const parts = [];
+    spreadPairs.forEach((p, i) => {
+      const s = getTermValue(cr, data, p.short);
+      const l = getTermValue(cr, data, p.long);
+      if (s != null && l != null) {
+        parts.push(`${p.name}: ${((l-s)*100).toFixed(1)}bp`);
+      }
+    });
+    spreadText = parts.join('  ');
+  }
+  
+  chart.setOption({
+    tooltip: { trigger: 'axis' },
+    legend: { data: spreadPairs.map(p=>p.name), top: 0 },
+    grid: { left: 50, right: 20, top: 50, bottom: 40 },
+    graphic: spreadText ? [{
+      type: 'text', right: 20, top: 28,
+      style: { text: spreadText, fontSize: 12, fill: '#333', fontWeight: 'bold' },
+    }] : [],
+    xAxis: { type: 'category', data: dates.map(d => d.slice(5)), axisLabel: { rotate: 45, fontSize: 10 } },
+    yAxis: { type: 'value', name: 'bp', axisLabel: { formatter: v => v.toFixed(0) } },
+    series
+  });
+}
+
+function renderKeyTable(data, row, maRow, prevRow, lastMonthDate, lastMonthRow) {
+  const terms = KEY_TERMS.filter(t => data.terms.includes(t));
+  let html = `<table><tr><th>期限</th><th>所选日 (%)</th><th>750MA (%)</th><th>日变动 (bp)</th><th>月变动 (bp)</th></tr>`;
+  
+  terms.forEach(t => {
+    const v = getTermValue(row, data, t);
+    const ma = maRow ? (()=>{ const idx=data.terms.indexOf(t); return idx>=0 && maRow[idx]!=null ? maRow[idx] : null; })() : null;
+    const pv = getTermValue(prevRow, data, t);
+    const mv = getTermValue(lastMonthRow, data, t);
+    const dayChg = (v!=null && pv!=null) ? (v-pv)*100 : null;
+    const monChg = (v!=null && mv!=null) ? (v-mv)*100 : null;
+    
+    html += `<tr>
+      <td style="font-weight:600">${t}</td>
+      <td>${v!=null ? v.toFixed(4) : '—'}</td>
+      <td style="color:#e67e22">${ma!=null ? ma.toFixed(4) : '—'}</td>
+      <td class="${dayChg>0 ? 'up' : dayChg<0 ? 'down' : ''}">${dayChg!=null ? (dayChg>0?'+':'')+dayChg.toFixed(1) : '—'}</td>
+      <td class="${monChg>0 ? 'up' : monChg<0 ? 'down' : ''}">${monChg!=null ? (monChg>0?'+':'')+monChg.toFixed(1) : '—'}</td>
+    </tr>`;
+  });
+  
+  html += '</table>';
+  document.getElementById('tableKey').innerHTML = html;
+}
+
+function renderHistoryChart(data) {
+  const dom = document.getElementById('chartHistory');
+  const chart = echarts.init(dom);
+  const term10Idx = data.terms.indexOf('10Y');
+  if (term10Idx < 0) { chart.setOption({}); return; }
+  
+  const dates = data.dates;
+  const values = data.rows.map(r => r[term10Idx] != null ? r[term10Idx] : null);
+  
+  // 750MA for 10Y
+  const maValues = [];
+  for (let i = 0; i < values.length; i++) {
+    const start = Math.max(0, i - 250);
+    let sum = 0, n = 0;
+    for (let j = start; j <= i; j++) {
+      if (values[j] != null) { sum += values[j]; n++; }
+    }
+    maValues.push(n > 0 ? +(sum/n).toFixed(4) : null);
+  }
+  
+  chart.setOption({
+    tooltip: { trigger: 'axis' },
+    legend: { data: ['10Y收益率','750MA'], top: 5 },
+    grid: { left: 50, right: 20, top: 40, bottom: 40 },
+    xAxis: { type: 'category', data: dates.map(d => d.slice(0,7)), axisLabel: { rotate: 45, fontSize: 9, interval: Math.floor(dates.length/12) } },
+    yAxis: { type: 'value', name: '%', axisLabel: { formatter: v => v.toFixed(2) } },
+    series: [
+      { name: '10Y收益率', type: 'line', data: values, symbol: 'none', lineStyle: { color: '#2e75b6', width: 1.5 } },
+      { name: '750MA', type: 'line', data: maValues, symbol: 'none', lineStyle: { color: '#e67e22', width: 2 } }
+    ]
+  });
+}
+
+// ============ 启动 ============
+window.addEventListener('load', init);
+window.addEventListener('resize', () => {
+  ['chartCurve','chartSpread','chartHistory'].forEach(id => {
+    const dom = document.getElementById(id);
+    if (dom) { const c = echarts.getInstanceByDom(dom); if (c) c.resize(); }
+  });
+});
+</script>
+</body>
+</html>
