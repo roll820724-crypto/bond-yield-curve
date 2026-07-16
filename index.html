@@ -243,7 +243,7 @@ function calc750MA(data, targetDate) {
   if (targetIdx < 0) return null;
   const terms = data.terms;
   const ma = new Array(terms.length).fill(null);
-  const startIdx = Math.max(0, targetIdx - 750);
+  const startIdx = Math.max(0, targetIdx - 749);
   const count = targetIdx - startIdx + 1;
   if (count < 20) return ma;
   for (let j = 0; j < terms.length; j++) {
