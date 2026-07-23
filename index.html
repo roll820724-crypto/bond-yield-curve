@@ -291,11 +291,9 @@ const DATA_FILES = {
   gov_spot: 'data.json',
   cdb_spot: 'data_cdb.json',
   gov_ytm: 'data_gov_ytm.json',
-  cdb_ytm: 'data_cdb_ytm.json',
-  corp_aaa: 'data_corp_aaa.json',
-  adbc: 'data_adbc.json',
-  exim: 'data_exim.json'
+  cdb_ytm: 'data_cdb_ytm.json'
 };
+const LAZY_FILES = { corp_aaa: 'data_corp_aaa.json', adbc: 'data_adbc.json', exim: 'data_exim.json' };
 const CURVE_NAMES = { gov_spot:'国债即期', cdb_spot:'国开债即期', gov_ytm:'国债到期', cdb_ytm:'国开债到期', corp_aaa:'企业债AAA', adbc:'农发债', exim:'进出口行债' };
 const KEY_TERMS = ['1Y','3Y','5Y','7Y','10Y','15Y','20Y','30Y','50Y'];
 
@@ -1099,6 +1097,19 @@ function getCheckedCurves() {
 
 function renderMode2Charts() {
   const curves = getCheckedCurves();
+  
+  // Lazy load new curves if needed
+  const needed = curves.filter(c => LAZY_FILES[c.key]).filter(c => !allData[c.key]);
+  if (needed.length > 0) {
+    Promise.all(needed.map(c =>
+      fetch(`${LAZY_FILES[c.key]}?t=${Date.now()}`).then(r => r.json()).then(d => { allData[c.key] = d; })
+    )).then(() => renderMode2Charts());
+    // Show loading
+    const dom = document.getElementById('m2Chart1');
+    const chart = echarts.getInstanceByDom(dom) || echarts.init(dom);
+    chart.setOption({title:{text:'正在加载新曲线数据...',left:'center',top:'center',textStyle:{color:'#999'}}});
+    return;
+  }
   
   // Update spread controls visibility
   const showSpreadCk = document.getElementById('m2ckSpread');
