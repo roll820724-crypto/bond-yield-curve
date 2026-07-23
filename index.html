@@ -359,8 +359,17 @@ function calc750MA(data, targetDate) {
 
 // ── 初始化 ──
 async function init() {
+  // 先获取版本号（绕过浏览器缓存）
+  let version = '';
+  try {
+    const vResp = await fetch('version.json?t=' + Date.now());
+    const vData = await vResp.json();
+    version = vData.version;
+  } catch(e) { console.warn('获取版本号失败，使用无缓存模式:', e); }
+  
   const promises = Object.entries(DATA_FILES).map(async ([key, file]) => {
-    try { const resp = await fetch(file); allData[key] = await resp.json(); }
+    const url = version ? `${file}?v=${version}` : `${file}?t=${Date.now()}`;
+    try { const resp = await fetch(url); allData[key] = await resp.json(); }
     catch(e) { console.warn(`加载 ${file} 失败:`, e); }
   });
   await Promise.all(promises);

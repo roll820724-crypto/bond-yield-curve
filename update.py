@@ -14,6 +14,7 @@ CDB_DATA_FILE = "data_cdb.json"
 GOV_YTM_FILE = "data_gov_ytm.json"
 CDB_YTM_FILE = "data_cdb_ytm.json"
 SUMMARY_FILE = "summary.json"
+VERSION_FILE = "version.json"
 
 CHINABOND_DOWNLOAD_URL = "https://yield.chinabond.com.cn/cbweb-mn/yc/bxjDownload"
 SEARCHYC_URL = "https://yield.chinabond.com.cn/cbweb-mn/yc/searchYc"
@@ -218,6 +219,10 @@ def main():
     
     generate_summary()
     
+    # 生成版本号文件（用于前端缓存破坏）
+    version_str = datetime.now(BJ_TZ).strftime('%Y%m%d%H%M%S')
+    save_json(VERSION_FILE, {"version": version_str, "date": today_str})
+    
     # 如果有新数据，推送到 GitHub Pages
     if any([ok1, ok2, ok3, ok4]):
         print("\n────────────────────────────────────────")
@@ -225,7 +230,7 @@ def main():
         import subprocess
         script_dir = os.path.dirname(os.path.abspath(__file__))
         try:
-            subprocess.run(["git", "add", DATA_FILE, CDB_DATA_FILE, GOV_YTM_FILE, CDB_YTM_FILE, SUMMARY_FILE],
+            subprocess.run(["git", "add", DATA_FILE, CDB_DATA_FILE, GOV_YTM_FILE, CDB_YTM_FILE, SUMMARY_FILE, VERSION_FILE],
                           cwd=script_dir, check=True, capture_output=True)
             subprocess.run(["git", "commit", "-m", f"数据更新至{today_str}"],
                           cwd=script_dir, check=True, capture_output=True)
