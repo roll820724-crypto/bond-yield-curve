@@ -1492,6 +1492,21 @@ function ffillDaily(dailyDates, sparseDates, sparseVals) {
 }
 
 async function renderMode3(data, row) {
+  // Show loading immediately on all cards
+  ['m3ChartCorridor','m3ChartBaseReturn','m3ChartMALevel','m3ChartMN'].forEach(id => {
+    const d = document.getElementById(id);
+    if (!d) return;
+    const c = echarts.getInstanceByDom(d);
+    if (c) c.dispose();
+    const nc = echarts.init(d);
+    nc.setOption({title:{text:'加载数据...',left:'center',top:'center',textStyle:{color:'#999',fontSize:16}}});
+  });
+  document.getElementById('m3Summary').innerHTML = 
+    '<div class="summary-card"><div class="title">参考利率 M</div><div class="value" style="color:#999">加载中...</div></div>' +
+    '<div class="summary-card"><div class="title">预定利率 N</div><div class="value" style="color:#999">加载中...</div></div>' +
+    '<div class="summary-card"><div class="title">走廊中值(6MMA)</div><div class="value" style="color:#999">加载中...</div></div>' +
+    '<div class="summary-card"><div class="title">基础回报水平</div><div class="value" style="color:#999">加载中...</div></div>';
+  
   // Load necessary data in parallel
   await Promise.all([ensureData('gov_ytm'), ensureData('cdb_ytm')]);
   const gYtm = allData.gov_ytm, cYtm = allData.cdb_ytm;
