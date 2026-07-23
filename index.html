@@ -190,8 +190,9 @@ td.warn{background:#fff3cd}
     <!-- ═══ 卡片1：不同曲线同期对比 ═══ -->
     <div class="chart-card" style="grid-column:1/-1">
       <h2>📉 不同曲线期限结构对比 <button onclick="exportCardFromChart('m2Chart1','期限结构对比')" style="font-size:11px;background:#2e75b6;color:#fff;border:none;border-radius:3px;padding:2px 8px;cursor:pointer;float:right;margin-top:-3px">📥底稿</button></h2>
-      <div class="card-desc">选中曲线叠加对比完整期限结构。选2条曲线时自动展示全期限利差（右轴，bp）。默认基准日为同一条曲线的最新日。</div>
-      <div class="chart" id="m2Chart1" style="height:420px"></div>
+      <div class="card-desc">选中曲线叠加对比完整期限结构。勾选「显示利差」后，可在下方独立图中查看自定义两曲线全期限利差（bp）。</div>
+      <div class="chart" id="m2Chart1" style="height:360px"></div>
+      <div class="chart" id="m2Chart1b" style="height:180px;display:none"></div>
     </div>
 
     <!-- ═══ 卡片2：税收溢价 ═══ -->
@@ -1124,13 +1125,25 @@ function renderMode2Charts() {
     const firstCurve = curves[0];
     const refData = getData(firstCurve.key), refRow = getRow(refData, selectedDate);
     const terms = refData.terms.filter(t => getTermValue(refRow, refData, t) != null && parseInt(t) >= 1);
-    const axes = [{type:'value', name:'%', axisLabel:{formatter:v=>v.toFixed(1)}}];
     const series = curves.map(c => ({
       name: c.name, type:'line', smooth:true, symbol:'none',
       data: terms.map(t => getTermValue(getRow(getData(c.key), selectedDate), getData(c.key), t)),
       lineStyle:{color:c.color, width:2}
     }));
+    chart.setOption({
+      tooltip:{trigger:'axis'}, legend:{data:series.map(s=>s.name), top:5},
+      grid:{left:50, right:20, top:40, bottom:25},
+      xAxis:{type:'category', data:terms.map(t=>t.replace('Y','')), name:'期限(年)', nameGap:25},
+      yAxis:{type:'value',name:'%',axisLabel:{formatter:v=>v.toFixed(1)}},
+      series
+    });
+    chart._exportData = {xData:terms.map(t=>t.replace('Y','')), series};
+
+    // 利差独立图
+    const domB = document.getElementById('m2Chart1b');
     if (showSpread && curves.length >= 2) {
+      domB.style.display = '';
+      const chartB = echarts.init(domB);
       const aKey = document.getElementById('m2spA').value;
       const bKey = document.getElementById('m2spB').value;
       const aData = getData(aKey), bData = getData(bKey);
@@ -1141,20 +1154,21 @@ function renderMode2Charts() {
         const a = getTermValue(aRow, aData, t), b = getTermValue(bRow, bData, t);
         return (a!=null && b!=null) ? +((a-b)*100).toFixed(2) : null;
       });
-      axes.push({type:'value', name:'利差(bp)', axisLabel:{formatter:v=>v+'bp'}});
-      series.push({
-        name:`${aName} − ${bName} (bp)`,
-        type:'bar', data:spreads, yAxisIndex:1,
-        itemStyle:{color: params => params.value>=0?'#c0392b':'#27ae60'}
+      chartB.setOption({
+        tooltip:{trigger:'axis', formatter:p=>p[0]?`${p[0].axisValue}年<br/>${aName}−${bName}: ${p[0].value}bp`:''},
+        grid:{left:50, right:20, top:30, bottom:25},
+        xAxis:{type:'category', data:terms.map(t=>t.replace('Y','')), name:'期限(年)', nameGap:25},
+        yAxis:{type:'value', name:'bp'},
+        series:[{
+          name:`${aName} − ${bName}`, type:'bar', data:spreads,
+          itemStyle:{color:params=>params.value>=0?'#c0392b':'#27ae60'}
+        }]
       });
+    } else {
+      domB.style.display = 'none';
+      const chartB = echarts.getInstanceByDom(domB);
+      if (chartB) chartB.dispose();
     }
-    chart.setOption({
-      tooltip:{trigger:'axis'}, legend:{data:series.map(s=>s.name), top:5},
-      grid:{left:50, right: showSpread&&curves.length>=2?70:20, top:40, bottom:25},
-      xAxis:{type:'category', data:terms.map(t=>t.replace('Y','')), name:'期限(年)', nameGap:25},
-      yAxis: axes, series
-    });
-    chart._exportData = {xData:terms.map(t=>t.replace('Y','')), series};
   })();
 
   // ==== 卡片2：税收溢价（国开-国债 9Y即期） ====
