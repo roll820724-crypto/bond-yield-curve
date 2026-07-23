@@ -1177,10 +1177,13 @@ function renderMode2Charts() {
     const gData = getData('gov_spot'), cData = getData('cdb_spot');
     const g9 = gData.terms.indexOf('9Y'), c9 = cData.terms.indexOf('9Y');
     if (g9<0 || c9<0) { chart.setOption({title:{text:'缺少9Y数据',left:'center',top:'center',textStyle:{color:'#999'}}}); return; }
+    // 按日期匹配，避免索引错位
+    const gDates = new Map(gData.dates.map((d,i) => [d, gData.rows[i][g9]]));
     const premiums = [], dates = [];
-    for (let i = 0; i < Math.min(gData.dates.length, cData.dates.length); i++) {
-      const g = gData.rows[i][g9], c = cData.rows[i][c9];
-      if (g!=null && c!=null) { dates.push(gData.dates[i]); premiums.push(+((c-g)*100).toFixed(2)); }
+    for (let i = 0; i < cData.dates.length; i++) {
+      const c = cData.rows[i][c9];
+      const g = gDates.get(cData.dates[i]);
+      if (c!=null && g!=null) { dates.push(cData.dates[i]); premiums.push(+((c-g)*100).toFixed(2)); }
     }
     chart.setOption({
       tooltip:{trigger:'axis'}, grid:{left:55,right:20,top:30,bottom:40},
