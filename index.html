@@ -118,7 +118,7 @@ td.warn{background:#fff3cd}
     </div>
     <div class="chart-card">
       <h2>📅 10Y 实际 vs 750MA ±1.96σ <button onclick="exportHistory()" style="float:right;font-size:10px;padding:1px 6px;background:#2e75b6;color:#fff;border:none;border-radius:3px;cursor:pointer">📥底稿</button></h2>
-      <div class="card-desc">10年期国债收益率历史走势叠加750MA及±1.96σ置信带（≈95%置信区间）。🟢=正常范围，🟠=利率显著偏低（债券偏贵），🔵=利率显著偏高（债券便宜）。数据自2019-06-30起（750MA需完整暖机期）。</div>
+      <div class="card-desc">10年期国债收益率历史走势叠加750MA及±1.96σ置信带（≈95%置信区间）。🟢=正常范围，🟠=利率显著偏低（债券偏贵），🔵=利率显著偏高（债券便宜）。数据自2013-01-01起（750MA约需3年暖机期，数据始于2008年）。</div>
       <div class="chart" id="m1ChartHistory"></div>
     </div>
     <div class="chart-card">
@@ -671,8 +671,8 @@ function renderMode1(data, row, prevRow, lastMonthRow) {
         blueLower.push(null); blueDiff.push(null);
       }
     }
-    // 截断到 2019-06-30（750MA 需约3年完整样本）
-    const cutoffIdx = Math.max(0, data.dates.findIndex(d => d >= '2019-06-30'));
+    // 截断到 2013-01-01（数据始于2008，750MA约需3年暖机期）
+    const cutoffIdx = Math.max(0, data.dates.findIndex(d => d >= '2013-01-01'));
     const vals2 = values.slice(cutoffIdx);
     const maV2 = maValues.slice(cutoffIdx);
     const ub2 = upperBand.slice(cutoffIdx);

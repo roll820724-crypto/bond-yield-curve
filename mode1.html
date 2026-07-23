@@ -570,8 +570,8 @@ function renderMode1(data, row, prevRow, lastMonthRow) {
         blueLower.push(null); blueDiff.push(null);
       }
     }
-    // 截断到 2019-06-30（750MA 需约3年完整样本）
-    const cutoffIdx = Math.max(0, data.dates.findIndex(d => d >= '2019-06-30'));
+    // 截断到 2013-01-01（数据始于2008，750MA约需3年暖机期）
+    const cutoffIdx = Math.max(0, data.dates.findIndex(d => d >= '2013-01-01'));
     const vals2 = values.slice(cutoffIdx);
     const maV2 = maValues.slice(cutoffIdx);
     const ub2 = upperBand.slice(cutoffIdx);
