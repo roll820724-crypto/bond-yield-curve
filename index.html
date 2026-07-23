@@ -1604,8 +1604,9 @@ async function renderMode3(data, row) {
     {label:'基础回报水平', val: lastBL!=null ? (lastBL*100).toFixed(2)+'%' : '—', col:'#8e44ad'},
   ].map(x => `<div class="summary-card"><div class="title">${x.label}</div><div class="value" style="color:${x.col}">${x.val}</div></div>`).join('');
   
-  // Filter to non-null data range for charts
-  const start = Math.max(750, Mvals.findIndex(v=>v!=null));
+  // Filter to non-null data range for charts — start from ~2019 (LPR data begins 2019-08)
+  let start = dates.findIndex(d => d >= '2019-01-01');
+  if (start < 0) start = 0;
   
   // ──── Chart 1: 利率走廊 ────
   (function() {
