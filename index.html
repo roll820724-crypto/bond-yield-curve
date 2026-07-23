@@ -256,28 +256,33 @@ td.warn{background:#fff3cd}
   <div class="chart-grid">
     <div class="chart-card">
       <h2>🏦 利率走廊</h2>
-      <div class="card-desc">LPR上限与定期存款下限构成的利率走廊，走廊中值6MMA为预定利率调节的参照锚。走廊持续下移→预定利率存在下调空间。</div>
+      <div class="card-desc">上限=5Y LPR，下限=5Y定存(ICBC)，中值6月MA为预定利率参照锚。走廊持续下移→预定利率下调空间打开。</div>
       <div class="chart" id="m3ChartCorridor"></div>
     </div>
     <div class="chart-card">
-      <h2>📊 基础回报水平</h2>
-      <div class="card-desc">10年期国债收益率叠加税收溢价构成的基础回报水平。250MA与750MA双均线分别反映中短期和长期趋势，两者的相对位置辅助判断利率方向。</div>
-      <div class="chart" id="m3ChartBase"></div>
+      <h2>💰 基础回报构建</h2>
+      <div class="card-desc">CGB 10Y到期 + 税收溢价(CDB 9Y到期 − CGB 9Y到期) = 基础回报。税收溢价反映国债免税优势。</div>
+      <div class="chart" id="m3ChartBaseReturn"></div>
     </div>
     <div class="chart-card">
-      <h2>📋 分段调节系数表</h2>
-      <div class="card-desc">基于基础回报水平所处区间，对应不同的调节系数。7段调节机制确保预定利率调整平滑有序，避免频繁大幅波动。</div>
+      <h2>📈 基础回报水平</h2>
+      <div class="card-desc">基础回报的250MA与750MA。取MIN=基础回报水平，用于计算M。蓝色填充=250MA>750MA（短>长）区域。</div>
+      <div class="chart" id="m3ChartMALevel"></div>
+    </div>
+    <div class="chart-card">
+      <h2>📊 参考利率M vs 预定利率N</h2>
+      <div class="card-desc">M = MIN(走廊中值6MMA, 基础回报水平)。N = 分段调节(M)。虚线为各段阈值。</div>
+      <div class="chart" id="m3ChartMN"></div>
+    </div>
+    <div class="chart-card">
+      <h2>📋 分段调节系数</h2>
+      <div class="card-desc">M落入不同区间对应不同调节系数。高区间大缓冲，低区间完全暴露。</div>
       <div id="m3TableCoeff"></div>
     </div>
     <div class="chart-card">
-      <h2>🏦 5年期定存利率调整历史</h2>
-      <div class="card-desc">工商银行整存整取5年期挂牌利率调整节点。每次调整均为六大行同步调息。<b>如需更新：联系管理员修改 data_deposit5y.json。</b></div>
+      <h2>🏦 5年定存调整历史</h2>
+      <div class="card-desc">ICBC整存整取5年挂牌利率。调整频次约年2-3次，六大行同步。<b>更新：修改data_deposit5y.json。</b></div>
       <div id="m3TableDeposit"></div>
-    </div>
-    <div class="chart-card">
-      <h2>📅 预定利率基准 N 历史走势</h2>
-      <div class="card-desc">N = 基础回报水平 × 分段调节系数。为寿险产品预定利率的基准参照，叠加10Y国债走势便于对比实际市场利率与监管基准的差异。</div>
-      <div class="chart" id="m3ChartN"></div>
     </div>
   </div>
 </div>
@@ -1388,59 +1393,228 @@ function renderM2Card5() {
 }
 
 // ═══════════════════════════════════════════════
-//  模式三：预定利率动态追踪
+//  模式三：预定利率动态追踪（基于到期收益率）
 // ═══════════════════════════════════════════════
-function renderMode3(data, row) {
-  // 占位 — 等 N 数据准备后填充
-  document.getElementById('m3Summary').innerHTML = 
-    '<div class="summary-card"><div class="title">预定利率基准 N</div><div class="value" style="color:#999">待数据就绪</div></div>' +
-    '<div class="summary-card"><div class="title">走廊中值 6MMA</div><div class="value" style="color:#999">—</div></div>' +
-    '<div class="summary-card"><div class="title">基础回报水平</div><div class="value" style="color:#999">—</div></div>' +
-    '<div class="summary-card"><div class="title">调整信号</div><div class="value" style="color:#999">—</div></div>';
-  
-  // 分段调节系数表（静态）
-  document.getElementById('m3TableCoeff').innerHTML = `<table>
-    <tr><th>参考利率区间</th><th>调节系数</th><th>分段基准</th><th>阈值</th><th>含义</th></tr>
-    <tr><td>4% 以上</td><td>20%</td><td>—</td><td>4.0</td><td>高位：大幅缓冲</td></tr>
-    <tr><td>(3.5%, 4%]</td><td>30%</td><td>—</td><td>3.5</td><td></td></tr>
-    <tr><td>(3%, 3.5%]</td><td>50%</td><td>2.95</td><td>3.0</td><td>中高位：跟一半</td></tr>
-    <tr><td>(2.5%, 3%]</td><td>95%</td><td>2.475</td><td>2.5</td><td>中位：几乎全跟</td></tr>
-    <tr><td>(2%, 2.5%]</td><td>95%</td><td>2.0</td><td>2.0</td><td>中低位：继续跟</td></tr>
-    <tr><td>(1%, 2%]</td><td>100%</td><td>1.0</td><td>1.0</td><td>低位：完全暴露</td></tr>
-    <tr><td>1% 以下</td><td>100%</td><td>0</td><td>0</td><td>临界：不设防</td></tr>
-  </table>`;
+const M3_SEGMENTS = [
+  {hi:Infinity, lo:4.0, coef:0.20, base:null, threshold:4.0, label:'4%以上'},
+  {hi:4.0, lo:3.5, coef:0.30, base:null, threshold:3.5, label:'(3.5%,4%]'},
+  {hi:3.5, lo:3.0, coef:0.50, base:2.95, threshold:3.0, label:'(3%,3.5%]'},
+  {hi:3.0, lo:2.5, coef:0.95, base:2.475, threshold:2.5, label:'(2.5%,3%]'},
+  {hi:2.5, lo:2.0, coef:0.95, base:2.0, threshold:2.0, label:'(2%,2.5%]'},
+  {hi:2.0, lo:1.0, coef:1.00, base:1.0, threshold:1.0, label:'(1%,2%]'},
+  {hi:1.0, lo:0, coef:1.00, base:0, threshold:0, label:'1%以下'},
+];
 
-  // 5年期定存利率调整历史
-  const deposit = allData.deposit5y;
-  if (deposit && deposit.dates && deposit.dates.length > 0) {
-    let rows = '';
-    for (let i = deposit.dates.length - 1; i >= 0; i--) {
-      const prevVal = i > 0 ? deposit.values[i - 1] : null;
-      const change = prevVal !== null ? (deposit.values[i] - prevVal).toFixed(2) : '—';
-      const changeClass = change > 0 ? 'up' : (change < 0 ? 'down' : '');
-      rows += `<tr>
-        <td>${deposit.dates[i]}</td>
-        <td><b>${deposit.values[i].toFixed(2)}%</b></td>
-        <td class="${changeClass}">${change !== '—' ? (change > 0 ? '+' : '') + change + 'pp' : '—'}</td>
-        <td style="font-size:11px;color:#888">${i === deposit.dates.length - 1 ? '← 当前' : ''}</td>
-      </tr>`;
+function adjN(M) {
+  for (const s of M3_SEGMENTS) {
+    if (M > s.lo && M <= s.hi) {
+      if (s.base == null) return M * s.coef;  // 高位区间：乘系数
+      return s.base + (M - s.threshold) * s.coef;
     }
-    document.getElementById('m3TableDeposit').innerHTML = `<table>
-      <tr><th>调整日期</th><th>5年期利率</th><th>变动</th><th></th></tr>
-      ${rows}
-    </table>`;
-  } else {
-    document.getElementById('m3TableDeposit').innerHTML = '<p style="color:#999;text-align:center;padding:20px">数据加载中...</p>';
+  }
+  return M;
+}
+
+function rollingMean(arr, window) {
+  const out = new Array(arr.length).fill(null);
+  let sum = 0, cnt = 0;
+  for (let i = 0; i < arr.length; i++) {
+    if (arr[i] != null) { sum += arr[i]; cnt++; }
+    if (i >= window && arr[i-window] != null) { sum -= arr[i-window]; cnt--; }
+    if (cnt > 0) out[i] = +(sum / cnt).toFixed(6);
+  }
+  return out;
+}
+
+function ffillDaily(dailyDates, sparseDates, sparseVals) {
+  // Forward-fill sparse monthly data to daily timeline
+  const out = new Array(dailyDates.length).fill(null);
+  let last = null;
+  for (let i = 0; i < dailyDates.length; i++) {
+    for (let j = 0; j < sparseDates.length; j++) {
+      if (sparseDates[j] > dailyDates[i]) break;
+      if (sparseDates[j] <= dailyDates[i] && sparseVals[j] != null) last = sparseVals[j];
+    }
+    out[i] = last;
+  }
+  return out;
+}
+
+async function renderMode3(data, row) {
+  // Load necessary data
+  await ensureData('gov_ytm');
+  await ensureData('cdb_ytm');
+  const gYtm = allData.gov_ytm, cYtm = allData.cdb_ytm;
+  const lpr = allData.lpr5y, deposit = allData.deposit5y;
+  if (!gYtm || !cYtm || !lpr || !deposit) {
+    document.getElementById('m3Summary').innerHTML = '<div class="summary-card"><div class="title">数据加载中...</div></div>';
+    return;
+  }
+
+  // ──── Step 1: Compute tax premium & base return ────
+  const g9 = gYtm.terms.indexOf('9Y'), c9 = cYtm.terms.indexOf('9Y');
+  const g10 = gYtm.terms.indexOf('10Y');
+  if (g9<0 || c9<0 || g10<0) return;
+  
+  const dates = gYtm.dates, n = dates.length;
+  const gDateIdx = {};
+  dates.forEach((d,i) => gDateIdx[d] = i);
+  
+  // Tax premium: CDB 9Y YTM - CGB 9Y YTM
+  const tax = new Array(n).fill(null);
+  const baseReturn = new Array(n).fill(null);
+  const cgb10y = new Array(n).fill(null);
+  for (let i = 0; i < cYtm.dates.length; i++) {
+    const d = cYtm.dates[i];
+    const gi = gDateIdx[d];
+    if (gi == null) continue;
+    const cv = cYtm.rows[i][c9], gv = gYtm.rows[gi][g9], gv10 = gYtm.rows[gi][g10];
+    if (cv!=null && gv!=null) tax[gi] = +((cv - gv) * 100).toFixed(2);  // bp
+    if (tax[gi]!=null && gv10!=null) baseReturn[gi] = +(gv10 + tax[gi]/100).toFixed(6);  // as rate
+    cgb10y[gi] = gv10;
   }
   
-  // 走廊占位图
-  ['m3ChartCorridor','m3ChartBase','m3ChartN'].forEach(id => {
-    const dom = document.getElementById(id);
-    const chart = echarts.init(dom);
+  // ──── Step 2: Base return MAs → base level ────
+  const br250 = rollingMean(baseReturn, 250);
+  const br750 = rollingMean(baseReturn, 750);
+  const baseLevel = br250.map((v,i) => (v!=null && br750[i]!=null) ? Math.min(v, br750[i]) : null);
+  
+  // ──── Step 3: Corridor ────
+  const lprFF = ffillDaily(dates, lpr.dates, lpr.values);
+  const depFF = ffillDaily(dates, deposit.dates, deposit.values);
+  const corridorMid = lprFF.map((l,i) => (l!=null && depFF[i]!=null) ? +(l + depFF[i])/2 : null);  // pct
+  const corridor6MMA = rollingMean(corridorMid, 126);  // 126 trading days ≈ 6 months
+  
+  // ──── Step 4: M = MIN(corridor6MMA, baseLevel)
+  const Mvals = corridor6MMA.map((c,i) => (c!=null && baseLevel[i]!=null) ? Math.min(c, baseLevel[i]) : null);
+  
+  // ──── Step 5: N = piecewise adjustment of M
+  const Nvals = Mvals.map(m => m!=null ? +adjN(m).toFixed(6) : null);
+  
+  // ──── Summary cards ────
+  let lastM = null, lastN = null, lastCorr = null, lastBL = null;
+  for (let i = n-1; i >= 0; i--) {
+    if (lastM==null && Mvals[i]!=null) lastM = Mvals[i];
+    if (lastN==null && Nvals[i]!=null) lastN = Nvals[i];
+    if (lastCorr==null && corridor6MMA[i]!=null) lastCorr = corridor6MMA[i];
+    if (lastBL==null && baseLevel[i]!=null) lastBL = baseLevel[i];
+    if (lastM!=null && lastN!=null && lastCorr!=null && lastBL!=null) break;
+  }
+  document.getElementById('m3Summary').innerHTML = [
+    {label:'参考利率 M', val: lastM!=null ? (lastM*100).toFixed(2)+'%' : '—', col:'#2e75b6'},
+    {label:'预定利率 N', val: lastN!=null ? (lastN*100).toFixed(2)+'%' : '—', col:'#e74c3c'},
+    {label:'走廊中值(6MMA)', val: lastCorr!=null ? (lastCorr*100).toFixed(2)+'%' : '—', col:'#27ae60'},
+    {label:'基础回报水平', val: lastBL!=null ? (lastBL*100).toFixed(2)+'%' : '—', col:'#8e44ad'},
+  ].map(x => `<div class="summary-card"><div class="title">${x.label}</div><div class="value" style="color:${x.col}">${x.val}</div></div>`).join('');
+  
+  // Filter to non-null data range for charts
+  const start = Math.max(750, Mvals.findIndex(v=>v!=null));
+  
+  // ──── Chart 1: 利率走廊 ────
+  (function() {
+    const dom = document.getElementById('m3ChartCorridor');
+    let chart = echarts.getInstanceByDom(dom); if(chart) chart.dispose();
+    chart = echarts.init(dom);
     chart.setOption({
-      title: { text: '待数据就绪', left:'center', top:'center', textStyle:{color:'#999',fontSize:16} }
+      tooltip:{trigger:'axis'}, legend:{data:['LPR 5Y','定存 5Y','走廊中值','走廊中值6MMA'], top:5},
+      grid:{left:55,right:20,top:40,bottom:40},
+      xAxis:{type:'category',data:dates.slice(start).map(d=>d.slice(0,7)),axisLabel:{rotate:45,fontSize:9,interval:Math.floor((n-start)/12)}},
+      yAxis:{type:'value',name:'%',axisLabel:{formatter:v=>v.toFixed(1)}},
+      series:[
+        {name:'LPR 5Y',type:'line',data:lprFF.slice(start).map(v=>v!=null?+v.toFixed(6):null),symbol:'none',lineStyle:{color:'#2e75b6',width:1.5}},
+        {name:'定存 5Y',type:'line',data:depFF.slice(start).map(v=>v!=null?+v.toFixed(6):null),symbol:'none',lineStyle:{color:'#e74c3c',width:1.5}},
+        {name:'走廊中值',type:'line',data:corridorMid.slice(start).map(v=>v!=null?+v.toFixed(6):null),symbol:'none',lineStyle:{color:'#999',width:1,type:'dashed'}},
+        {name:'走廊中值6MMA',type:'line',data:corridor6MMA.slice(start).map(v=>v!=null?+v.toFixed(6):null),symbol:'none',lineStyle:{color:'#27ae60',width:2}},
+      ]
     });
-  });
+  })();
+  
+  // ──── Chart 2: 基础回报构建 ────
+  (function() {
+    const dom = document.getElementById('m3ChartBaseReturn');
+    let chart = echarts.getInstanceByDom(dom); if(chart) chart.dispose();
+    chart = echarts.init(dom);
+    chart.setOption({
+      tooltip:{trigger:'axis'}, legend:{data:['CGB 10Y到期','税收溢价(bp,右轴)','基础回报'], top:5},
+      grid:{left:55,right:60,top:40,bottom:40},
+      xAxis:{type:'category',data:dates.slice(start).map(d=>d.slice(0,7)),axisLabel:{rotate:45,fontSize:9,interval:Math.floor((n-start)/12)}},
+      yAxis:[
+        {type:'value',name:'%',axisLabel:{formatter:v=>v.toFixed(1)}},
+        {type:'value',name:'bp'}
+      ],
+      series:[
+        {name:'CGB 10Y到期',type:'line',data:cgb10y.slice(start),symbol:'none',lineStyle:{color:'#2e75b6',width:1.5}},
+        {name:'税收溢价(bp,右轴)',type:'line',yAxisIndex:1,data:tax.slice(start),symbol:'none',lineStyle:{color:'#e74c3c',width:1},areaStyle:{color:'rgba(231,76,60,0.06)'}},
+        {name:'基础回报',type:'line',data:baseReturn.slice(start),symbol:'none',lineStyle:{color:'#8e44ad',width:2}},
+      ]
+    });
+  })();
+  
+  // ──── Chart 3: 基础回报水平 (250MA vs 750MA) ────
+  (function() {
+    const dom = document.getElementById('m3ChartMALevel');
+    let chart = echarts.getInstanceByDom(dom); if(chart) chart.dispose();
+    chart = echarts.init(dom);
+    chart.setOption({
+      tooltip:{trigger:'axis'}, legend:{data:['基础回报','250MA','750MA','基础回报水平(MIN)'], top:5},
+      grid:{left:55,right:20,top:40,bottom:40},
+      xAxis:{type:'category',data:dates.slice(start).map(d=>d.slice(0,7)),axisLabel:{rotate:45,fontSize:9,interval:Math.floor((n-start)/12)}},
+      yAxis:{type:'value',name:'%',axisLabel:{formatter:v=>v.toFixed(1)}},
+      series:[
+        {name:'基础回报',type:'line',data:baseReturn.slice(start),symbol:'none',lineStyle:{color:'#ccc',width:0.5}},
+        {name:'250MA',type:'line',data:br250.slice(start),symbol:'none',lineStyle:{color:'#e74c3c',width:1.5}},
+        {name:'750MA',type:'line',data:br750.slice(start),symbol:'none',lineStyle:{color:'#2e75b6',width:1.5}},
+        {name:'基础回报水平(MIN)',type:'line',data:baseLevel.slice(start),symbol:'none',lineStyle:{color:'#8e44ad',width:2.5}},
+      ]
+    });
+  })();
+  
+  // ──── Chart 4: M vs N ────
+  (function() {
+    const dom = document.getElementById('m3ChartMN');
+    let chart = echarts.getInstanceByDom(dom); if(chart) chart.dispose();
+    chart = echarts.init(dom);
+    const markLines = M3_SEGMENTS.filter(s=>s.threshold>0.5).map(s=>({yAxis:s.threshold,lineStyle:{color:'#999',type:'dashed',width:0.5},label:{formatter:s.label,fontSize:9}}));
+    chart.setOption({
+      tooltip:{trigger:'axis'}, legend:{data:['参考利率 M','预定利率 N'], top:5},
+      grid:{left:55,right:20,top:40,bottom:40},
+      xAxis:{type:'category',data:dates.slice(start).map(d=>d.slice(0,7)),axisLabel:{rotate:45,fontSize:9,interval:Math.floor((n-start)/12)}},
+      yAxis:{type:'value',name:'%',axisLabel:{formatter:v=>v.toFixed(1)},
+        max: val => Math.max(4.5, (val.max||0)*1.05)
+      },
+      series:[
+        {name:'参考利率 M',type:'line',data:Mvals.slice(start),symbol:'none',lineStyle:{color:'#2e75b6',width:2},
+          markLine:{silent:true,symbol:'none',data:markLines}},
+        {name:'预定利率 N',type:'line',data:Nvals.slice(start),symbol:'none',lineStyle:{color:'#e74c3c',width:2.5},
+          areaStyle:{color:'rgba(231,76,60,0.08)'}},
+      ]
+    });
+  })();
+  
+  // ──── 分段调节系数表 ────
+  document.getElementById('m3TableCoeff').innerHTML = `<table>
+    <tr><th>参考利率区间</th><th>调节系数</th><th>分段基准</th><th>阈值</th><th>含义</th></tr>
+    ${M3_SEGMENTS.map(s => `<tr>
+      <td>${s.label}</td><td>${(s.coef*100).toFixed(0)}%</td>
+      <td>${s.base!=null?(s.base*100).toFixed(2)+'%':'—'}</td>
+      <td>${(s.threshold*100).toFixed(1)}%</td>
+      <td>${s.coef<0.5?'高位：大幅缓冲':s.coef<1?'中位：部分跟':'低位：完全暴露'}</td>
+    </tr>`).join('')}
+  </table>`;
+  
+  // ──── 定存调整历史 ────
+  if (deposit.dates && deposit.dates.length > 0) {
+    let rows = '';
+    for (let i = deposit.dates.length - 1; i >= 0; i--) {
+      const prev = i > 0 ? deposit.values[i - 1] : null;
+      const change = prev != null ? (deposit.values[i] - prev).toFixed(2) : '—';
+      rows += `<tr><td>${deposit.dates[i]}</td><td><b>${deposit.values[i].toFixed(2)}%</b></td>
+        <td class="${change>0?'up':'down'}">${change!=='—'?(change>0?'+':'')+change+'pp':'—'}</td>
+        <td style="font-size:11px;color:#888">${i===deposit.dates.length-1?'← 当前':''}</td></tr>`;
+    }
+    document.getElementById('m3TableDeposit').innerHTML = `<table>
+      <tr><th>调整日期</th><th>5年期利率</th><th>变动</th><th></th></tr>${rows}</table>`;
+  }
 }
 
 // ── 响应式 ──
