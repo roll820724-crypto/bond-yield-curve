@@ -434,7 +434,15 @@ function switchMode(mode) {
   // 模式一显示曲线选择，模式二三隐藏
   document.getElementById('toolbarCurve').style.display = mode === 'mode1' ? '' : 'none';
   if (mode === 'mode1') renderAll();
-  if (mode === 'mode2') { ensureData('cdb_spot').then(() => renderAll()); }
+  if (mode === 'mode2') { 
+    if (allData.cdb_spot) renderAll();
+    else ensureData('cdb_spot').then(() => renderAll());
+  }
+  if (mode === 'mode3') {
+    document.getElementById('m3LoadBox').style.display = 'none';
+    document.getElementById('m3Content').style.display = '';
+    renderAll();
+  }
 }
 
 // ── 预加载模式二常用数据 ──
@@ -532,6 +540,8 @@ async function init() {
   
   renderAll();
   setTimeout(initExtrapDate, 200);
+  // 后台预拉模式二核心数据
+  setTimeout(() => ensureData('cdb_spot'), 1000);
 }
 
 function refresh() {
