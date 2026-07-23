@@ -165,28 +165,73 @@ td.warn{background:#fff3cd}
 
 <!-- ═══════════ 模式二：折现率溢价（当日线） ═══════════ -->
 <div class="mode-content" id="mode2">
-  <div class="summary-grid" id="m2Summary"></div>
+
+  <!-- ═══ 工具栏：模式二专属 ═══ -->
+  <div style="max-width:1400px;margin:0 auto 12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;background:#fff;padding:10px 20px;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.08)">
+    <span style="font-size:13px;color:#666;font-weight:600">曲线：</span>
+    <label style="font-size:12px;cursor:pointer"><input type="checkbox" id="m2ckGovSpot" checked onchange="renderMode2Charts()"> 国债即期</label>
+    <label style="font-size:12px;cursor:pointer"><input type="checkbox" id="m2ckGovYtm" checked onchange="renderMode2Charts()"> 国债到期</label>
+    <label style="font-size:12px;cursor:pointer"><input type="checkbox" id="m2ckCdbSpot" checked onchange="renderMode2Charts()"> 国开即期</label>
+    <label style="font-size:12px;cursor:pointer"><input type="checkbox" id="m2ckCdbYtm" checked onchange="renderMode2Charts()"> 国开到期</label>
+  </div>
+
   <div class="chart-grid">
-    <div class="chart-card">
-      <h2>📉 即期收益率曲线（四条对比）</h2>
-      <div class="card-desc">同一日期四条曲线的叠加对比。国债即期 vs 国开即期=信用溢价，即期 vs 到期=息票效应差异。曲线越陡峭→期限溢价越高。</div>
-      <div class="chart" id="m2ChartSpot"></div>
+
+    <!-- ═══ 卡片1：不同曲线同期对比 ═══ -->
+    <div class="chart-card" style="grid-column:1/-1">
+      <h2>📉 不同曲线期限结构对比 <button onclick="exportCardFromChart('m2Chart1','期限结构对比')" style="font-size:11px;background:#2e75b6;color:#fff;border:none;border-radius:3px;padding:2px 8px;cursor:pointer;float:right;margin-top:-3px">📥底稿</button></h2>
+      <div class="card-desc">选中曲线叠加对比完整期限结构。选2条曲线时自动展示全期限利差（右轴，bp）。默认基准日为同一条曲线的最新日。</div>
+      <div class="chart" id="m2Chart1" style="height:420px"></div>
     </div>
+
+    <!-- ═══ 卡片2：税收溢价 ═══ -->
     <div class="chart-card">
-      <h2>💳 信用溢价（国开-国债利差）</h2>
-      <div class="card-desc">国开债即期收益率减去同期限国债即期收益率（bp）。反映政策性银行信用风险定价，溢价走阔通常对应信用环境收紧。</div>
-      <div class="chart" id="m2ChartCredit"></div>
+      <h2>💰 税收溢价（国开-国债 9Y即期） <button onclick="exportCardFromChart('m2Chart2','税收溢价')" style="font-size:11px;background:#2e75b6;color:#fff;border:none;border-radius:3px;padding:2px 8px;cursor:pointer;float:right;margin-top:-3px">📥底稿</button></h2>
+      <div class="card-desc">国开债9年期即期 − 国债9年期即期（bp）。反映国债免税优势的市场定价，是预定利率模型中税收溢价的核心输入。</div>
+      <div class="chart" id="m2Chart2" style="height:360px"></div>
     </div>
+
+    <!-- ═══ 卡片3：期限结构对比（双日期） ═══ -->
     <div class="chart-card">
-      <h2>📋 关键期限即期收益率</h2>
-      <div class="card-desc">各关键期限即期与到期收益率，含即期-到期差（bp）。底部标注曲线形态：陡峭/平坦/倒挂。</div>
-      <div id="m2TableKey"></div>
+      <h2>🔄 期限结构对比 <button onclick="exportCardFromChart('m2Chart3','期限结构对比')" style="font-size:11px;background:#2e75b6;color:#fff;border:none;border-radius:3px;padding:2px 8px;cursor:pointer;float:right;margin-top:-3px">📥底稿</button></h2>
+      <div class="card-desc">同一曲线在两个时点上的期限结构差异。利差 = 基准日 − 对比日（bp），正值表示基准日利率更高。</div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
+        <select id="m2s3Curve" onchange="renderM2Card3()" style="font-size:12px;padding:3px 6px">
+          <option value="gov_spot">国债即期</option><option value="gov_ytm">国债到期</option>
+          <option value="cdb_spot">国开即期</option><option value="cdb_ytm">国开到期</option>
+        </select>
+        <label style="font-size:11px">基准日:<input type="date" id="m2d3Base" onchange="renderM2Card3()" style="font-size:11px;padding:2px"></label>
+        <label style="font-size:11px">对比日:<input type="date" id="m2d3Comp" onchange="renderM2Card3()" style="font-size:11px;padding:2px"></label>
+      </div>
+      <div class="chart" id="m2Chart3" style="height:360px"></div>
     </div>
+
+    <!-- ═══ 卡片4：10年期走势 ═══ -->
     <div class="chart-card">
-      <h2>📅 信用溢价历史走势</h2>
-      <div class="card-desc">10年期国开-国债即期利差时间序列，虚线为历史均值。利差高于均值→信用环境偏紧，低于均值→信用环境宽松。</div>
-      <div class="chart" id="m2ChartCreditHistory"></div>
+      <h2>📅 10年期收益率走势 <button onclick="exportCardFromChart('m2Chart4','10年期走势')" style="font-size:11px;background:#2e75b6;color:#fff;border:none;border-radius:3px;padding:2px 8px;cursor:pointer;float:right;margin-top:-3px">📥底稿</button></h2>
+      <div class="card-desc">选中曲线的10年期收益率在选定时间区间内的历史走势。用于观察长端利率趋势和关键拐点。</div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
+        <select id="m2s4Curve" onchange="renderM2Card4()" style="font-size:12px;padding:3px 6px">
+          <option value="gov_spot">国债即期</option><option value="gov_ytm">国债到期</option>
+          <option value="cdb_spot">国开即期</option><option value="cdb_ytm">国开到期</option>
+        </select>
+        <label style="font-size:11px">起始:<input type="date" id="m2d4Start" onchange="renderM2Card4()" style="font-size:11px;padding:2px"></label>
+        <label style="font-size:11px">终止:<input type="date" id="m2d4End" onchange="renderM2Card4()" style="font-size:11px;padding:2px"></label>
+      </div>
+      <div class="chart" id="m2Chart4" style="height:360px"></div>
     </div>
+
+    <!-- ═══ 卡片5：AAA企业债较国开债溢价 ═══ -->
+    <div class="chart-card">
+      <h2>🏢 AAA企业债 较 国开债溢价（10Y） <button onclick="exportCardFromChart('m2Chart5','AAA-国开溢价')" style="font-size:11px;background:#2e75b6;color:#fff;border:none;border-radius:3px;padding:2px 8px;cursor:pointer;float:right;margin-top:-3px">📥底稿</button></h2>
+      <div class="card-desc">AAA企业债10年期即期 − 国开债10年期即期（bp）。溢价走阔→信用分化加剧，收窄→信用环境改善。虚线为区间均值。</div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
+        <label style="font-size:11px">起始:<input type="date" id="m2d5Start" onchange="renderM2Card5()" style="font-size:11px;padding:2px"></label>
+        <label style="font-size:11px">终止:<input type="date" id="m2d5End" onchange="renderM2Card5()" style="font-size:11px;padding:2px"></label>
+      </div>
+      <div class="chart" id="m2Chart5" style="height:360px"></div>
+    </div>
+
   </div>
 </div>
 
@@ -231,7 +276,8 @@ const DATA_FILES = {
   gov_spot: 'data.json',
   cdb_spot: 'data_cdb.json',
   gov_ytm: 'data_gov_ytm.json',
-  cdb_ytm: 'data_cdb_ytm.json'
+  cdb_ytm: 'data_cdb_ytm.json',
+  corp_aaa: 'data_corp_aaa.json'
 };
 const CURVE_NAMES = { gov_spot:'国债即期', cdb_spot:'国开债即期', gov_ytm:'国债到期', cdb_ytm:'国开债到期' };
 const KEY_TERMS = ['1Y','3Y','5Y','7Y','10Y','15Y','20Y','30Y','50Y'];
@@ -999,118 +1045,219 @@ function computeExtrapolation() {
 // ═══════════════════════════════════════════════
 //  模式二：折现率溢价（当日线）
 // ═══════════════════════════════════════════════
+//  模式二：当日线相关分析
+// ═══════════════════════════════════════════════
 function renderMode2(data, row, prevRow, lastMonthRow) {
-  // 汇总卡片
-  const spot = getData('gov_spot'), spotRow = getRow(spot, selectedDate);
-  const ytm = getData('gov_ytm'), ytmRow = getRow(ytm, selectedDate);
-  const cdb_spot = getData('cdb_spot'), cdbRow = getRow(cdb_spot, selectedDate);
-  
-  const y10_s = getTermValue(spotRow, spot, '10Y');
-  const y1_s = getTermValue(spotRow, spot, '1Y');
-  const y10_y = getTermValue(ytmRow, ytm, '10Y');
-  const cdb10 = getTermValue(cdbRow, cdb_spot, '10Y');
-  
-  const spread10Y1Y = (y10_s!=null && y1_s!=null) ? +((y10_s - y1_s)*100).toFixed(0) : null;
-  const creditSpread = (cdb10!=null && y10_y!=null) ? +((cdb10 - y10_y)*100).toFixed(0) : null;
-  const curveShape = spread10Y1Y != null ? (spread10Y1Y > 80 ? '陡峭 ↑' : spread10Y1Y < 30 ? '平坦(倒挂风险)' : '正常') : '—';
-  
-  document.getElementById('m2Summary').innerHTML = [
-    {label:'10Y 国债即期', val: y10_s!=null ? y10_s.toFixed(4)+'%' : '—'},
-    {label:'10Y 国债到期', val: y10_y!=null ? y10_y.toFixed(4)+'%' : '—'},
-    {label:'10Y 信用溢价', val: creditSpread!=null ? creditSpread+'bp' : '—'},
-    {label:'曲线形态(10-1Y)', val: spread10Y1Y!=null ? spread10Y1Y+'bp' : '—', note: curveShape},
-  ].map(x => `<div class="summary-card"><div class="title">${x.label}</div><div class="value">${x.val}</div>${x.note ? `<div class="change">${x.note}</div>` : ''}</div>`).join('');
-  
-  // 四条即期曲线对比
+  renderMode2Charts();
+}
+
+function exportCardFromChart(domId, sheetName) {
+  const dom = document.getElementById(domId);
+  const chart = echarts.getInstanceByDom(dom);
+  if (!chart) return;
+  const opt = chart.getOption();
+  const series = opt.series || [];
+  const cols = ['期限/日期', ...series.filter(s=>s.data).map(s=>s.name)];
+  const xData = opt.xAxis[0].data || [];
+  const rows = xData.map((x,i) => [x, ...series.filter(s=>s.data).map(s=>s.data[i]!=null?s.data[i]:'')]);
+  const ws = XLSX.utils.aoa_to_sheet([cols, ...rows]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  XLSX.writeFile(wb, `底稿_${sheetName}.xlsx`);
+}
+
+const M2_CURVES = [
+  {key:'gov_spot', name:'国债即期', color:'#2e75b6', ck:'m2ckGovSpot'},
+  {key:'gov_ytm', name:'国债到期', color:'#27ae60', ck:'m2ckGovYtm'},
+  {key:'cdb_spot', name:'国开即期', color:'#e74c3c', ck:'m2ckCdbSpot'},
+  {key:'cdb_ytm', name:'国开到期', color:'#8e44ad', ck:'m2ckCdbYtm'},
+];
+
+function getCheckedCurves() {
+  return M2_CURVES.filter(c => document.getElementById(c.ck).checked);
+}
+
+function renderMode2Charts() {
+  const curves = getCheckedCurves();
+  if (curves.length === 0) {
+    const dom = document.getElementById('m2Chart1'); const c = echarts.init(dom);
+    c.setOption({title:{text:'请至少勾选一条曲线',left:'center',top:'center',textStyle:{color:'#999'}}});
+    return;
+  }
+
+  // ==== 卡片1：不同曲线期限结构对比 ====
   (function() {
-    const dom = document.getElementById('m2ChartSpot');
-    const chart = echarts.init(dom);
-    const curves = [
-      {key:'gov_spot', name:'国债即期', color:'#2e75b6'},
-      {key:'cdb_spot', name:'国开即期', color:'#e74c3c'},
-      {key:'gov_ytm', name:'国债到期', color:'#27ae60'},
-      {key:'cdb_ytm', name:'国开到期', color:'#8e44ad'},
-    ];
-    const terms = spot.terms.filter(t => getTermValue(spotRow, spot, t) != null);
-    chart.setOption({
-      tooltip: { trigger:'axis' },
-      legend: { data: curves.map(c=>c.name), top:5 },
-      grid: { left:50, right:20, top:40, bottom:25 },
-      xAxis: { type:'category', data: terms.map(t=>t.replace('Y','')), name:'期限(年)', nameGap:25 },
-      yAxis: { type:'value', name:'%', axisLabel:{formatter:v=>v.toFixed(1)} },
-      series: curves.map(c => ({
-        name: c.name, type:'line', smooth:true, symbol:'none',
-        data: terms.map(t => getTermValue(getRow(getData(c.key), selectedDate), getData(c.key), t)),
-        lineStyle:{color:c.color, width:2}
-      }))
-    });
-  })();
-  
-  // 信用溢价（国开-国债）即期
-  (function() {
-    const dom = document.getElementById('m2ChartCredit');
-    const chart = echarts.init(dom);
-    const terms = spot.terms.filter(t => getTermValue(spotRow, spot, t)!=null && getTermValue(cdbRow, cdb_spot, t)!=null);
-    const credits = terms.map(t => {
-      const g = getTermValue(spotRow, spot, t), c = getTermValue(cdbRow, cdb_spot, t);
-      return (g!=null && c!=null) ? +((c-g)*100).toFixed(2) : null;
-    });
-    chart.setOption({
-      tooltip: { trigger:'axis', formatter: p => p[0] ? `${p[0].axisValue}年<br/>信用溢价: ${p[0].value}bp` : '' },
-      grid: { left:50, right:20, top:30, bottom:25 },
-      xAxis: { type:'category', data: terms.map(t=>t.replace('Y','')), name:'期限(年)', nameGap:25 },
-      yAxis: { type:'value', name:'bp' },
-      series: [{ name:'信用溢价', type:'bar', data:credits, itemStyle:{color: params => params.value > 0 ? '#c0392b' : '#27ae60'} }]
-    });
-  })();
-  
-  // 关键期限即期收益
-  (function() {
-    const terms = KEY_TERMS.filter(t => spot.terms.includes(t));
-    let html = `<table><tr><th>期限</th><th>国债即期 (%)</th><th>国债到期 (%)</th><th>国开即期 (%)</th><th>即期-到期差 (bp)</th></tr>`;
-    terms.forEach(t => {
-      const gs = getTermValue(spotRow, spot, t), gy = getTermValue(ytmRow, ytm, t);
-      const cs = getTermValue(cdbRow, cdb_spot, t);
-      const diff = (gs!=null && gy!=null) ? (gs-gy)*100 : null;
-      html += `<tr>
-        <td style="font-weight:600">${t}</td>
-        <td>${gs!=null ? gs.toFixed(4) : '—'}</td>
-        <td>${gy!=null ? gy.toFixed(4) : '—'}</td>
-        <td>${cs!=null ? cs.toFixed(4) : '—'}</td>
-        <td class="${diff>0?'up':'down'}">${diff!=null ? (diff>0?'+':'')+diff.toFixed(1) : '—'}</td>
-      </tr>`;
-    });
-    html += '</table>';
-    document.getElementById('m2TableKey').innerHTML = html;
-  })();
-  
-  // 信用溢价历史走势
-  (function() {
-    const dom = document.getElementById('m2ChartCreditHistory');
-    const chart = echarts.init(dom);
-    const gData = getData('gov_ytm'), cData = getData('cdb_ytm');
-    const term10G = gData.terms.indexOf('10Y'), term10C = cData.terms.indexOf('10Y');
-    if (term10G < 0 || term10C < 0) return;
-    const credits = [];
-    const dates = [];
-    for (let i = 0; i < Math.max(gData.dates.length, cData.dates.length); i++) {
-      if (i >= gData.dates.length || i >= cData.dates.length) break;
-      const g = gData.rows[i][term10G], c = cData.rows[i][term10C];
-      if (g != null && c != null) {
-        dates.push(gData.dates[i]);
-        credits.push(+((c-g)*100).toFixed(2));
-      }
+    const dom = document.getElementById('m2Chart1'); const chart = echarts.init(dom);
+    const firstCurve = curves[0];
+    const refData = getData(firstCurve.key), refRow = getRow(refData, selectedDate);
+    const terms = refData.terms.filter(t => getTermValue(refRow, refData, t) != null && parseInt(t) >= 1);
+    const axes = [{type:'value', name:'%', axisLabel:{formatter:v=>v.toFixed(1)}}];
+    const series = curves.map(c => ({
+      name: c.name, type:'line', smooth:true, symbol:'none',
+      data: terms.map(t => getTermValue(getRow(getData(c.key), selectedDate), getData(c.key), t)),
+      lineStyle:{color:c.color, width:2}
+    }));
+    if (curves.length === 2) {
+      // Show spread on right axis
+      const aData = getData(curves[0].key), bData = getData(curves[1].key);
+      const aRow = getRow(aData, selectedDate), bRow = getRow(bData, selectedDate);
+      const spreads = terms.map(t => {
+        const a = getTermValue(aRow, aData, t), b = getTermValue(bRow, bData, t);
+        return (a!=null && b!=null) ? +((a-b)*100).toFixed(2) : null;
+      });
+      axes.push({type:'value', name:'利差(bp)', axisLabel:{formatter:v=>v+'bp'}});
+      series.push({
+        name:`${curves[0].name} − ${curves[1].name} (bp)`,
+        type:'bar', data:spreads, yAxisIndex:1,
+        itemStyle:{color: params => params.value>=0?'#c0392b':'#27ae60'}
+      });
     }
     chart.setOption({
-      tooltip: { trigger:'axis' },
-      grid: { left:50, right:20, top:30, bottom:40 },
-      xAxis: { type:'category', data: dates.map(d=>d.slice(0,7)), axisLabel:{rotate:45,fontSize:9,interval:Math.floor(dates.length/12)} },
-      yAxis: { type:'value', name:'bp' },
-      series: [{ name:'10Y信用溢价', type:'line', data:credits, symbol:'none', lineStyle:{color:'#e74c3c',width:1.5},
-        markLine: { silent:true, data:[{type:'average',name:'均值'}], lineStyle:{color:'#888',type:'dashed'} }
+      tooltip:{trigger:'axis'}, legend:{data:series.map(s=>s.name), top:5},
+      grid:{left:50, right: curves.length===2?70:20, top:40, bottom:25},
+      xAxis:{type:'category', data:terms.map(t=>t.replace('Y','')), name:'期限(年)', nameGap:25},
+      yAxis: axes, series
+    });
+    // Cache for export
+    chart._exportData = {xData:terms.map(t=>t.replace('Y','')), series};
+  })();
+
+  // ==== 卡片2：税收溢价（国开-国债 9Y即期） ====
+  (function() {
+    const dom = document.getElementById('m2Chart2'); const chart = echarts.init(dom);
+    const gData = getData('gov_spot'), cData = getData('cdb_spot');
+    const g9 = gData.terms.indexOf('9Y'), c9 = cData.terms.indexOf('9Y');
+    if (g9<0 || c9<0) { chart.setOption({title:{text:'缺少9Y数据',left:'center',top:'center',textStyle:{color:'#999'}}}); return; }
+    const premiums = [], dates = [];
+    for (let i = 0; i < Math.min(gData.dates.length, cData.dates.length); i++) {
+      const g = gData.rows[i][g9], c = cData.rows[i][c9];
+      if (g!=null && c!=null) { dates.push(gData.dates[i]); premiums.push(+((c-g)*100).toFixed(2)); }
+    }
+    chart.setOption({
+      tooltip:{trigger:'axis'}, grid:{left:55,right:20,top:30,bottom:40},
+      xAxis:{type:'category', data:dates.map(d=>d.slice(0,7)), axisLabel:{rotate:45,fontSize:9,interval:Math.floor(dates.length/12)}},
+      yAxis:{type:'value',name:'bp'},
+      series:[{
+        name:'9Y税收溢价', type:'line', data:premiums, symbol:'none', areaStyle:{color:'rgba(231,76,60,0.1)'},
+        lineStyle:{color:'#e74c3c',width:1.5},
+        markLine:{silent:true,data:[{type:'average',name:'均值'}],lineStyle:{color:'#888',type:'dashed'}}
       }]
     });
+    chart._exportData = {xData:dates, series:[{name:'日期', data:dates},{name:'9Y税收溢价(bp)', data:premiums}]};
   })();
+
+  // ==== 卡片3：期限结构对比（双日期） ====
+  renderM2Card3();
+
+  // ==== 卡片4：10年期走势 ====
+  renderM2Card4();
+
+  // ==== 卡片5：AAA企业债 vs 国开债溢价 ====
+  renderM2Card5();
+}
+
+function renderM2Card3() {
+  const dom = document.getElementById('m2Chart3'); const chart = echarts.init(dom);
+  const curveKey = document.getElementById('m2s3Curve').value;
+  const data = getData(curveKey);
+  if (!data.dates.length) { chart.setOption({title:{text:'数据加载中',left:'center',top:'center',textStyle:{color:'#999'}}}); return; }
+  
+  const baseDate = document.getElementById('m2d3Base').value || data.dates[data.dates.length-1];
+  const compDate = document.getElementById('m2d3Comp').value || data.dates[0];
+  document.getElementById('m2d3Base').value = baseDate;
+  document.getElementById('m2d3Comp').value = compDate;
+  
+  const baseRow = getRow(data, baseDate), compRow = getRow(data, compDate);
+  const terms = data.terms.filter(t => {
+    const b = getTermValue(baseRow, data, t), c = getTermValue(compRow, data, t);
+    return b!=null && c!=null && parseInt(t)>=1;
+  });
+  
+  chart.setOption({
+    tooltip:{trigger:'axis'}, legend:{data:[`基准日 ${baseDate}`,`对比日 ${compDate}`,`利差(bp)`], top:5},
+    grid:{left:50,right:70,top:40,bottom:25},
+    xAxis:{type:'category', data:terms.map(t=>t.replace('Y','')), name:'期限(年)', nameGap:25},
+    yAxis:[
+      {type:'value',name:'%',axisLabel:{formatter:v=>v.toFixed(1)}},
+      {type:'value',name:'bp'}
+    ],
+    series:[
+      {name:`基准日 ${baseDate}`, type:'line', smooth:true, symbol:'none',
+       data:terms.map(t=>getTermValue(baseRow, data, t)), lineStyle:{color:'#2e75b6',width:2}},
+      {name:`对比日 ${compDate}`, type:'line', smooth:true, symbol:'none',
+       data:terms.map(t=>getTermValue(compRow, data, t)), lineStyle:{color:'#e74c3c',width:2}},
+      {name:'利差(bp)', type:'bar', yAxisIndex:1,
+       data:terms.map(t=>{const b=getTermValue(baseRow,data,t),c=getTermValue(compRow,data,t); return b!=null&&c!=null?+((b-c)*100).toFixed(2):null;}),
+       itemStyle:{color:params=>params.value>=0?'#c0392b':'#27ae60'}}
+    ]
+  });
+}
+
+function renderM2Card4() {
+  const dom = document.getElementById('m2Chart4'); const chart = echarts.init(dom);
+  const curveKey = document.getElementById('m2s4Curve').value;
+  const data = getData(curveKey);
+  if (!data.dates.length) { chart.setOption({title:{text:'数据加载中',left:'center',top:'center',textStyle:{color:'#999'}}}); return; }
+  
+  const term10 = data.terms.indexOf('10Y');
+  if (term10 < 0) { chart.setOption({title:{text:'缺少10Y数据',left:'center',top:'center',textStyle:{color:'#999'}}}); return; }
+  
+  let start = document.getElementById('m2d4Start').value || data.dates[0];
+  let end = document.getElementById('m2d4End').value || data.dates[data.dates.length-1];
+  document.getElementById('m2d4Start').value = start;
+  document.getElementById('m2d4End').value = end;
+  
+  const values = [], dates = [];
+  for (let i = 0; i < data.dates.length; i++) {
+    if (data.dates[i] >= start && data.dates[i] <= end && data.rows[i][term10] != null) {
+      dates.push(data.dates[i]); values.push(+data.rows[i][term10].toFixed(4));
+    }
+  }
+  chart.setOption({
+    tooltip:{trigger:'axis'},
+    grid:{left:55,right:20,top:30,bottom:40},
+    xAxis:{type:'category',data:dates.map(d=>d.slice(0,7)),axisLabel:{rotate:45,fontSize:9,interval:Math.floor(dates.length/12)}},
+    yAxis:{type:'value',name:'%',axisLabel:{formatter:v=>v.toFixed(2)}},
+    series:[{name:'10Y',type:'line',data:values,symbol:'none',areaStyle:{color:'rgba(46,117,182,0.08)'},lineStyle:{color:'#2e75b6',width:1.5}}]
+  });
+}
+
+function renderM2Card5() {
+  const dom = document.getElementById('m2Chart5'); const chart = echarts.init(dom);
+  const corpData = getData('corp_aaa'), cdbData = getData('cdb_spot');
+  if (!corpData.dates.length || !cdbData.dates.length) {
+    chart.setOption({title:{text:'企业债数据未就绪（回填中）',left:'center',top:'center',textStyle:{color:'#999'}}});
+    return;
+  }
+  const c10 = corpData.terms.indexOf('10Y'), d10 = cdbData.terms.indexOf('10Y');
+  if (c10<0 || d10<0) { chart.setOption({title:{text:'缺少10Y数据',left:'center',top:'center',textStyle:{color:'#999'}}}); return; }
+  
+  let start = document.getElementById('m2d5Start').value || corpData.dates[0];
+  let end = document.getElementById('m2d5End').value || corpData.dates[corpData.dates.length-1];
+  document.getElementById('m2d5Start').value = start;
+  document.getElementById('m2d5End').value = end;
+  
+  const spreads = [], dates = [], corpDateSet = new Set(corpData.dates);
+  for (let i = 0; i < cdbData.dates.length; i++) {
+    if (cdbData.dates[i] < start || cdbData.dates[i] > end) continue;
+    if (!corpDateSet.has(cdbData.dates[i]) || cdbData.rows[i][d10]==null) continue;
+    const ci = corpData.dates.indexOf(cdbData.dates[i]);
+    if (ci>=0 && corpData.rows[ci][c10]!=null) {
+      dates.push(cdbData.dates[i]);
+      spreads.push(+((corpData.rows[ci][c10] - cdbData.rows[i][d10])*100).toFixed(2));
+    }
+  }
+  chart.setOption({
+    tooltip:{trigger:'axis'},
+    grid:{left:55,right:20,top:30,bottom:40},
+    xAxis:{type:'category',data:dates.map(d=>d.slice(0,7)),axisLabel:{rotate:45,fontSize:9,interval:Math.floor(dates.length/12)}},
+    yAxis:{type:'value',name:'bp'},
+    series:[{
+      name:'AAA-国开溢价(10Y)',type:'line',data:spreads,symbol:'none',areaStyle:{color:'rgba(142,68,173,0.1)'},
+      lineStyle:{color:'#8e44ad',width:1.5},
+      markLine:{silent:true,data:[{type:'average',name:'均值'}],lineStyle:{color:'#888',type:'dashed'}}
+    }]
+  });
 }
 
 // ═══════════════════════════════════════════════
