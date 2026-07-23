@@ -168,6 +168,7 @@ def compute():
             "M": last(M),
             "N": last(N),
             "corridor_6mma": last(corridor_6mma),
+            "corridor_mid": last(corridor_mid),
             "base_level": last(base_level),
             "lpr5y": last(lpr_ff),
             "deposit5y": last(dep_ff),
