@@ -441,6 +441,17 @@ function switchMode(mode) {
   if (mode === 'mode3') {
     document.getElementById('m3LoadBox').style.display = 'none';
     document.getElementById('m3Content').style.display = '';
+    // Show loading immediately while async renderMode3 works
+    document.getElementById('m3Summary').innerHTML = 
+      '<div class="summary-card"><div class="title">加载中...</div></div>'.repeat(4);
+    ['m3ChartCorridor','m3ChartBaseReturn','m3ChartMALevel','m3ChartMN'].forEach(id => {
+      const d = document.getElementById(id);
+      if (!d) return;
+      const c = echarts.getInstanceByDom(d);
+      if (c) c.dispose();
+      const nc = echarts.init(d);
+      nc.setOption({title:{text:'加载数据...',left:'center',top:'center',textStyle:{color:'#999',fontSize:14}}});
+    });
     renderAll();
   }
 }
@@ -540,8 +551,6 @@ async function init() {
   
   renderAll();
   setTimeout(initExtrapDate, 200);
-  // 后台预拉模式二核心数据
-  setTimeout(() => ensureData('cdb_spot'), 1000);
 }
 
 function refresh() {
