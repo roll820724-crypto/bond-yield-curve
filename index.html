@@ -1145,9 +1145,20 @@ function renderMode2Charts() {
     });
     Promise.all(needed.map(c =>
       fetch(`${LAZY_FILES[c.key]}?t=${Date.now()}`).then(r => r.json()).then(d => { allData[c.key] = d; })
-    )).then(() => renderMode2Charts());
+    )).then(() => renderMode2Charts()).catch(e => {
+      console.error('Mode2 lazy load failed:', e);
+      renderMode2Charts(); // Try to render with whatever we have
+    });
     return;
   }
+  
+  // Clear all old chart instances before re-rendering
+  ['m2Chart1','m2Chart2','m2Chart3','m2Chart4','m2Chart5','m2Chart1b'].forEach(id => {
+    const d = document.getElementById(id);
+    if (!d) return;
+    const c = echarts.getInstanceByDom(d);
+    if (c) c.dispose();
+  });
   
   // Update spread controls visibility
   const showSpreadCk = document.getElementById('m2ckSpread');
@@ -1254,6 +1265,7 @@ function renderMode2Charts() {
     });
     // 季度末摘要
     (function() {
+      if (!dates.length) return;
       const qEnds = []; // 找最近5个季度末
       const now = new Date();
       for (let q = 0; q < 5; q++) {
