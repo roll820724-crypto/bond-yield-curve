@@ -173,6 +173,16 @@ td.warn{background:#fff3cd}
     <label style="font-size:12px;cursor:pointer"><input type="checkbox" id="m2ckGovYtm" checked onchange="renderMode2Charts()"> 国债到期</label>
     <label style="font-size:12px;cursor:pointer"><input type="checkbox" id="m2ckCdbSpot" checked onchange="renderMode2Charts()"> 国开即期</label>
     <label style="font-size:12px;cursor:pointer"><input type="checkbox" id="m2ckCdbYtm" checked onchange="renderMode2Charts()"> 国开到期</label>
+    <label style="font-size:12px;cursor:pointer"><input type="checkbox" id="m2ckAdbc" onchange="renderMode2Charts()"> 农发债</label>
+    <label style="font-size:12px;cursor:pointer"><input type="checkbox" id="m2ckExim" onchange="renderMode2Charts()"> 进出口行债</label>
+    <label style="font-size:12px;cursor:pointer"><input type="checkbox" id="m2ckCorp" onchange="renderMode2Charts()"> 企业债AAA</label>
+    <span style="margin-left:16px">|</span>
+    <label style="font-size:12px;cursor:pointer"><input type="checkbox" id="m2ckSpread" onchange="renderMode2Charts()"> 显示利差</label>
+    <span id="m2SpreadCtrls" style="display:none">
+      <select id="m2spA" onchange="renderMode2Charts()" style="font-size:12px;padding:3px"></select>
+      <span style="font-size:12px"> − </span>
+      <select id="m2spB" onchange="renderMode2Charts()" style="font-size:12px;padding:3px"></select>
+    </span>
   </div>
 
   <div class="chart-grid">
@@ -194,7 +204,7 @@ td.warn{background:#fff3cd}
     <!-- ═══ 卡片3：期限结构对比（双日期） ═══ -->
     <div class="chart-card">
       <h2>🔄 期限结构对比 <button onclick="exportCardFromChart('m2Chart3','期限结构对比')" style="font-size:11px;background:#2e75b6;color:#fff;border:none;border-radius:3px;padding:2px 8px;cursor:pointer;float:right;margin-top:-3px">📥底稿</button></h2>
-      <div class="card-desc">同一曲线在两个时点上的期限结构差异。利差 = 基准日 − 对比日（bp），正值表示基准日利率更高。</div>
+      <div class="card-desc">同一曲线在两个时点上的期限结构差异。下方表格列示各期限利差（基准日 − 对比日，bp），正值表示基准日利率更高。</div>
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
         <select id="m2s3Curve" onchange="renderM2Card3()" style="font-size:12px;padding:3px 6px">
           <option value="gov_spot">国债即期</option><option value="gov_ytm">国债到期</option>
@@ -1075,6 +1085,9 @@ const M2_CURVES = [
   {key:'gov_ytm', name:'国债到期', color:'#27ae60', ck:'m2ckGovYtm'},
   {key:'cdb_spot', name:'国开即期', color:'#e74c3c', ck:'m2ckCdbSpot'},
   {key:'cdb_ytm', name:'国开到期', color:'#8e44ad', ck:'m2ckCdbYtm'},
+  {key:'adbc', name:'农发债', color:'#e67e22', ck:'m2ckAdbc'},
+  {key:'exim', name:'进出口行债', color:'#1abc9c', ck:'m2ckExim'},
+  {key:'corp_aaa', name:'企业债AAA', color:'#f39c12', ck:'m2ckCorp'},
 ];
 
 function getCheckedCurves() {
@@ -1083,6 +1096,22 @@ function getCheckedCurves() {
 
 function renderMode2Charts() {
   const curves = getCheckedCurves();
+  
+  // Update spread controls visibility
+  const showSpreadCk = document.getElementById('m2ckSpread');
+  const spreadCtrls = document.getElementById('m2SpreadCtrls');
+  const showSpread = showSpreadCk.checked;
+  spreadCtrls.style.display = showSpread ? 'inline' : 'none';
+  
+  if (showSpread) {
+    const spA = document.getElementById('m2spA'), spB = document.getElementById('m2spB');
+    const curA = spA.value, curB = spB.value;
+    spA.innerHTML = curves.map(c => `<option value="${c.key}" ${c.key===curA?'selected':''}>${c.name}</option>`).join('');
+    spB.innerHTML = curves.map(c => `<option value="${c.key}" ${c.key===curB?'selected':''}>${c.name}</option>`).join('');
+    if (!curves.find(c=>c.key===curA)) spA.value = curves[0]?.key || '';
+    if (!curves.find(c=>c.key===curB)) spB.value = curves[1]?.key || curves[0]?.key || '';
+  }
+  
   if (curves.length === 0) {
     const dom = document.getElementById('m2Chart1'); const c = echarts.init(dom);
     c.setOption({title:{text:'请至少勾选一条曲线',left:'center',top:'center',textStyle:{color:'#999'}}});
@@ -1101,28 +1130,30 @@ function renderMode2Charts() {
       data: terms.map(t => getTermValue(getRow(getData(c.key), selectedDate), getData(c.key), t)),
       lineStyle:{color:c.color, width:2}
     }));
-    if (curves.length === 2) {
-      // Show spread on right axis
-      const aData = getData(curves[0].key), bData = getData(curves[1].key);
+    if (showSpread && curves.length >= 2) {
+      const aKey = document.getElementById('m2spA').value;
+      const bKey = document.getElementById('m2spB').value;
+      const aData = getData(aKey), bData = getData(bKey);
       const aRow = getRow(aData, selectedDate), bRow = getRow(bData, selectedDate);
+      const aName = curves.find(c=>c.key===aKey)?.name || aKey;
+      const bName = curves.find(c=>c.key===bKey)?.name || bKey;
       const spreads = terms.map(t => {
         const a = getTermValue(aRow, aData, t), b = getTermValue(bRow, bData, t);
         return (a!=null && b!=null) ? +((a-b)*100).toFixed(2) : null;
       });
       axes.push({type:'value', name:'利差(bp)', axisLabel:{formatter:v=>v+'bp'}});
       series.push({
-        name:`${curves[0].name} − ${curves[1].name} (bp)`,
+        name:`${aName} − ${bName} (bp)`,
         type:'bar', data:spreads, yAxisIndex:1,
         itemStyle:{color: params => params.value>=0?'#c0392b':'#27ae60'}
       });
     }
     chart.setOption({
       tooltip:{trigger:'axis'}, legend:{data:series.map(s=>s.name), top:5},
-      grid:{left:50, right: curves.length===2?70:20, top:40, bottom:25},
+      grid:{left:50, right: showSpread&&curves.length>=2?70:20, top:40, bottom:25},
       xAxis:{type:'category', data:terms.map(t=>t.replace('Y','')), name:'期限(年)', nameGap:25},
       yAxis: axes, series
     });
-    // Cache for export
     chart._exportData = {xData:terms.map(t=>t.replace('Y','')), series};
   })();
 
@@ -1177,24 +1208,51 @@ function renderM2Card3() {
     return b!=null && c!=null && parseInt(t)>=1;
   });
   
+  const line1 = terms.map(t => getTermValue(baseRow, data, t));
+  const line2 = terms.map(t => getTermValue(compRow, data, t));
+  const diffs = terms.map(t => {
+    const b=getTermValue(baseRow,data,t),c=getTermValue(compRow,data,t);
+    return b!=null&&c!=null ? +((b-c)*100).toFixed(2) : null;
+  });
+
   chart.setOption({
-    tooltip:{trigger:'axis'}, legend:{data:[`基准日 ${baseDate}`,`对比日 ${compDate}`,`利差(bp)`], top:5},
-    grid:{left:50,right:70,top:40,bottom:25},
+    tooltip:{trigger:'axis', formatter: params => {
+      if (!params||!params.length) return '';
+      const t = params[0].axisValue;
+      let s=`<b>${t}年</b><br/>`;
+      params.forEach(p=>{
+        if (p.seriesIndex<2) s+=`${p.marker}${p.seriesName}: ${(typeof p.value==='number')?p.value.toFixed(4)+'%':'—'}<br/>`;
+        else s+=`${p.marker}利差: ${p.value}bp<br/>`;
+      });
+      return s;
+    }},
+    legend:{data:[`基准日 ${baseDate}`,`对比日 ${compDate}`], top:5},
+    grid:{left:50,right:20,top:40,bottom:25},
     xAxis:{type:'category', data:terms.map(t=>t.replace('Y','')), name:'期限(年)', nameGap:25},
-    yAxis:[
-      {type:'value',name:'%',axisLabel:{formatter:v=>v.toFixed(1)}},
-      {type:'value',name:'bp'}
-    ],
+    yAxis:{type:'value',name:'%',axisLabel:{formatter:v=>v.toFixed(1)}},
     series:[
       {name:`基准日 ${baseDate}`, type:'line', smooth:true, symbol:'none',
-       data:terms.map(t=>getTermValue(baseRow, data, t)), lineStyle:{color:'#2e75b6',width:2}},
+       data:line1, lineStyle:{color:'#2e75b6',width:2}},
       {name:`对比日 ${compDate}`, type:'line', smooth:true, symbol:'none',
-       data:terms.map(t=>getTermValue(compRow, data, t)), lineStyle:{color:'#e74c3c',width:2}},
-      {name:'利差(bp)', type:'bar', yAxisIndex:1,
-       data:terms.map(t=>{const b=getTermValue(baseRow,data,t),c=getTermValue(compRow,data,t); return b!=null&&c!=null?+((b-c)*100).toFixed(2):null;}),
-       itemStyle:{color:params=>params.value>=0?'#c0392b':'#27ae60'}}
+       data:line2, lineStyle:{color:'#e74c3c',width:2}},
     ]
   });
+  
+  // 下方利差明细表
+  const card = dom.parentElement;
+  let oldTable = card.querySelector('.spread-table');
+  if (oldTable) oldTable.remove();
+  const tbl = document.createElement('table');
+  tbl.className = 'spread-table';
+  tbl.style.cssText = 'margin-top:8px;font-size:11px';
+  let tbody = `<tr><th>期限</th><th>基准日(%)</th><th>对比日(%)</th><th>利差(bp)</th></tr>`;
+  for (let i=0;i<terms.length;i++) {
+    const d=diffs[i];
+    tbody += `<tr><td>${terms[i]}</td><td>${line1[i].toFixed(4)}</td><td>${line2[i]!=null?line2[i].toFixed(4):'—'}</td>
+      <td class="${d>0?'up':'down'}">${d!=null?(d>0?'+':'')+d.toFixed(1):'—'}</td></tr>`;
+  }
+  tbl.innerHTML = tbody;
+  card.appendChild(tbl);
 }
 
 function renderM2Card4() {
