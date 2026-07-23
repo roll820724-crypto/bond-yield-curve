@@ -1560,11 +1560,12 @@ function renderM3FromPrecomputed(pc) {
   
   // Summary
   const L = pc.latest;
+  const fmt = v => v != null ? v.toFixed(2) + '%' : '—';
   document.getElementById('m3Summary').innerHTML = [
-    {label:'参考利率 M', val: L.M!=null ? (L.M*100).toFixed(2)+'%' : '—', col:'#2e75b6'},
-    {label:'预定利率 N', val: L.N!=null ? (L.N*100).toFixed(2)+'%' : '—', col:'#e74c3c'},
-    {label:'走廊中值(6MMA)', val: L.corridor_6mma!=null ? (L.corridor_6mma*100).toFixed(2)+'%' : '—', col:'#27ae60'},
-    {label:'基础回报水平', val: L.base_level!=null ? (L.base_level*100).toFixed(2)+'%' : '—', col:'#8e44ad'},
+    {label:'参考利率 M', val: fmt(L.M), col:'#2e75b6'},
+    {label:'预定利率 N', val: fmt(L.N), col:'#e74c3c'},
+    {label:'走廊中值(6MMA)', val: fmt(L.corridor_6mma), col:'#27ae60'},
+    {label:'基础回报水平', val: fmt(L.base_level), col:'#8e44ad'},
   ].map(x => `<div class="summary-card"><div class="title">${x.label}</div><div class="value" style="color:${x.col}">${x.val}</div></div>`).join('');
   
   const n = dates.length;

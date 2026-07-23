@@ -131,9 +131,9 @@ def compute():
     # ── Step 5: N = 分段调节 ──
     N = [round(adj_N(m), 6) if m is not None else None for m in M]
 
-    # ── 截取 2019 起（图表展示起点） ──
+    # ── 截取 2025 起（机制实施日期） ──
     try:
-        start = next(i for i, d in enumerate(dates) if d >= '2019-01-01')
+        start = next(i for i, d in enumerate(dates) if d >= '2025-01-01')
     except StopIteration:
         start = 0
 
