@@ -294,6 +294,16 @@ td.warn{background:#fff3cd}
       <div id="m3TableCoeff"></div>
     </div>
     <div class="chart-card">
+      <h2>🔍 分段调整前后对比</h2>
+      <div class="card-desc">M→N调整过程。M落入区间后按对应公式计算N，用于校验分段逻辑。</div>
+      <div id="m3TableAdj"></div>
+    </div>
+    <div class="chart-card">
+      <h2>📊 LPR/定存验证数据</h2>
+      <div class="card-desc">模式三计算中用到的LPR5Y、定存5Y、走廊中值及其6月MA，用于校验输入数据。</div>
+      <div id="m3TableLPR"></div>
+    </div>
+    <div class="chart-card">
       <h2>🏦 5年定存调整历史</h2>
       <div class="card-desc">ICBC整存整取5年挂牌利率。调整频次约年2-3次，六大行同步。<b>更新：修改data_deposit5y.json。</b></div>
       <div id="m3TableDeposit"></div>
@@ -1458,7 +1468,17 @@ function renderM2Card4() {
 }
 
 function renderM2Card5() {
-  const dom = document.getElementById('m2Chart5'); const chart = echarts.init(dom);
+  const dom = document.getElementById('m2Chart5');
+  // Ensure data loaded
+  if (!allData.corp_aaa || !allData.cdb_spot) {
+    let c = echarts.getInstanceByDom(dom); if (c) c.dispose();
+    c = echarts.init(dom);
+    c.setOption({title:{text:'加载企业债数据...',left:'center',top:'center',textStyle:{color:'#999'}}});
+    Promise.all([ensureData('corp_aaa'), ensureData('cdb_spot')]).then(() => renderM2Card5());
+    return;
+  }
+  let chart = echarts.getInstanceByDom(dom); if (chart) chart.dispose();
+  chart = echarts.init(dom);
   const corpData = getData('corp_aaa'), cdbData = getData('cdb_spot');
   if (!corpData.dates.length || !cdbData.dates.length) {
     chart.setOption({title:{text:'企业债数据未就绪（回填中）',left:'center',top:'center',textStyle:{color:'#999'}}});
@@ -1675,6 +1695,33 @@ function renderM3FromPrecomputed(pc) {
     </tr>`).join('')}
   </table>`;
   
+  // Adjustment detail: M → N
+  const M = L.M, Nv = L.N;
+  let seg = N_SEGMENTS.find(s => M != null && M > s.lo && M <= s.hi);
+  let formula = '—';
+  if (seg) {
+    if (seg.base == null) formula = `N = M × ${(seg.coef*100).toFixed(0)}% = ${M.toFixed(2)}% × ${(seg.coef*100).toFixed(0)}% = ${Nv.toFixed(2)}%`;
+    else formula = `N = ${seg.base.toFixed(2)}% + (M − ${seg.threshold.toFixed(1)}%) × ${(seg.coef*100).toFixed(0)}%`;
+  }
+  document.getElementById('m3TableAdj').innerHTML = `<table>
+    <tr><th>参考利率M</th><th>落入区间</th><th>调整公式</th><th>预定利率N</th></tr>
+    <tr><td>${M!=null?M.toFixed(2)+'%':'—'}</td><td>${seg?seg.label:'—'}</td>
+    <td style="font-size:12px">${formula}</td><td><b>${Nv!=null?Nv.toFixed(2)+'%':'—'}</b></td></tr>
+  </table>`;
+  
+  // LPR validation table (latest values)
+  document.getElementById('m3TableLPR').innerHTML = `<table>
+    <tr><th>指标</th><th>最新值</th><th>说明</th></tr>
+    <tr><td>5年LPR</td><td>${L.lpr5y!=null?L.lpr5y.toFixed(2)+'%':'—'}</td><td>贷款市场报价利率，走廊上限</td></tr>
+    <tr><td>5年定存(ICBC)</td><td>${L.deposit5y!=null?L.deposit5y.toFixed(2)+'%':'—'}</td><td>走廊下限</td></tr>
+    <tr><td>走廊中值</td><td>${L.corridor_mid!=null?L.corridor_mid.toFixed(2)+'%':'—'}</td><td>(LPR+定存)/2</td></tr>
+    <tr><td>走廊中值6MMA</td><td>${L.corridor_6mma!=null?L.corridor_6mma.toFixed(2)+'%':'—'}</td><td>126日移动平均</td></tr>
+    <tr><td>国债10Y到期</td><td>${L.cgb_10y!=null?L.cgb_10y.toFixed(2)+'%':'—'}</td><td>基础回报构建</td></tr>
+    <tr><td>税收溢价(9Y)</td><td>${L.tax_premium!=null?L.tax_premium.toFixed(2)+' bp':'—'}</td><td>国开9Y−国债9Y</td></tr>
+    <tr><td>基础回报</td><td>${L.base_return!=null?L.base_return.toFixed(2)+'%':'—'}</td><td>CGB10Y+税收溢价</td></tr>
+    <tr><td>基础回报250MA</td><td>${L.base_level!=null?L.base_level.toFixed(2)+'%':'—'}</td><td>br250</td></tr>
+  </table>`;
+  
   // Deposit history (from global allData)
   const deposit = allData.deposit5y;
   if (deposit && deposit.dates && deposit.dates.length > 0) {
@@ -1764,10 +1811,10 @@ async function renderM3ComputeFull(data, row) {
     if (lastM!=null && lastN!=null && lastCorr!=null && lastBL!=null) break;
   }
   document.getElementById('m3Summary').innerHTML = [
-    {label:'参考利率 M', val: lastM!=null ? (lastM*100).toFixed(2)+'%' : '—', col:'#2e75b6'},
-    {label:'预定利率 N', val: lastN!=null ? (lastN*100).toFixed(2)+'%' : '—', col:'#e74c3c'},
-    {label:'走廊中值(6MMA)', val: lastCorr!=null ? (lastCorr*100).toFixed(2)+'%' : '—', col:'#27ae60'},
-    {label:'基础回报水平', val: lastBL!=null ? (lastBL*100).toFixed(2)+'%' : '—', col:'#8e44ad'},
+    {label:'参考利率 M', val: lastM!=null ? lastM.toFixed(2)+'%' : '—', col:'#2e75b6'},
+    {label:'预定利率 N', val: lastN!=null ? lastN.toFixed(2)+'%' : '—', col:'#e74c3c'},
+    {label:'走廊中值(6MMA)', val: lastCorr!=null ? lastCorr.toFixed(2)+'%' : '—', col:'#27ae60'},
+    {label:'基础回报水平', val: lastBL!=null ? lastBL.toFixed(2)+'%' : '—', col:'#8e44ad'},
   ].map(x => `<div class="summary-card"><div class="title">${x.label}</div><div class="value" style="color:${x.col}">${x.val}</div></div>`).join('');
   
   // Filter to non-null data range for charts — start from ~2019 (LPR data begins 2019-08)
@@ -1864,6 +1911,38 @@ async function renderM3ComputeFull(data, row) {
       <td>${(s.threshold*100).toFixed(1)}%</td>
       <td>${s.coef<0.5?'高位：大幅缓冲':s.coef<1?'中位：部分跟':'低位：完全暴露'}</td>
     </tr>`).join('')}
+  </table>`;
+  
+  // ──── 调整前后对比 ────
+  const seg = M3_SEGMENTS.find(s => lastM != null && lastM > s.lo && lastM <= s.hi);
+  let fml = '—';
+  if (seg) {
+    if (seg.base == null) fml = `N = M × ${(seg.coef*100).toFixed(0)}% = ${lastM.toFixed(2)}% × ${(seg.coef*100).toFixed(0)}% = ${lastN.toFixed(2)}%`;
+    else fml = `N = ${seg.base.toFixed(2)}% + (M − ${seg.threshold.toFixed(1)}%) × ${(seg.coef*100).toFixed(0)}%`;
+  }
+  document.getElementById('m3TableAdj').innerHTML = `<table>
+    <tr><th>参考利率M</th><th>落入区间</th><th>调整公式</th><th>预定利率N</th></tr>
+    <tr><td>${lastM!=null?lastM.toFixed(2)+'%':'—'}</td><td>${seg?seg.label:'—'}</td>
+    <td style="font-size:12px">${fml}</td><td><b>${lastN!=null?lastN.toFixed(2)+'%':'—'}</b></td></tr>
+  </table>`;
+  
+  // ──── LPR验证表 ────
+  const lLPR = lprFF.slice().reverse().find(v=>v!=null);
+  const lDEP = depFF.slice().reverse().find(v=>v!=null);
+  const lMID = corridorMid.slice().reverse().find(v=>v!=null);
+  const lC10 = cgb10y.slice().reverse().find(v=>v!=null);
+  const lTAX = tax.slice().reverse().find(v=>v!=null);
+  const lBR = baseReturn.slice().reverse().find(v=>v!=null);
+  document.getElementById('m3TableLPR').innerHTML = `<table>
+    <tr><th>指标</th><th>最新值</th><th>说明</th></tr>
+    <tr><td>5年LPR</td><td>${lLPR!=null?lLPR.toFixed(2)+'%':'—'}</td><td>走廊上限</td></tr>
+    <tr><td>5年定存(ICBC)</td><td>${lDEP!=null?lDEP.toFixed(2)+'%':'—'}</td><td>走廊下限</td></tr>
+    <tr><td>走廊中值</td><td>${lMID!=null?lMID.toFixed(2)+'%':'—'}</td><td>(LPR+定存)/2</td></tr>
+    <tr><td>走廊中值6MMA</td><td>${lastCorr!=null?lastCorr.toFixed(2)+'%':'—'}</td><td>126日MA</td></tr>
+    <tr><td>国债10Y到期</td><td>${lC10!=null?lC10.toFixed(2)+'%':'—'}</td><td>CGB 10Y</td></tr>
+    <tr><td>税收溢价(9Y)</td><td>${lTAX!=null?lTAX.toFixed(2)+' bp':'—'}</td><td>国开9Y−国债9Y</td></tr>
+    <tr><td>基础回报</td><td>${lBR!=null?lBR.toFixed(2)+'%':'—'}</td><td>CGB10Y+税收溢价</td></tr>
+    <tr><td>基础回报水平</td><td>${lastBL!=null?lastBL.toFixed(2)+'%':'—'}</td><td>MIN(250MA,750MA)</td></tr>
   </table>`;
   
   // ──── 定存调整历史 ────
