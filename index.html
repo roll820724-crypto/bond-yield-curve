@@ -167,7 +167,7 @@ td.warn{background:#fff3cd}
 <div class="mode-content" id="mode2">
 
   <!-- ═══ 工具栏：模式二专属 ═══ -->
-  <div style="max-width:1400px;margin:0 auto 12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;background:#fff;padding:10px 20px;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.08)">
+  <div id="m2Toolbar" style="max-width:1400px;margin:0 auto 12px;display:none;gap:12px;align-items:center;flex-wrap:wrap;background:#fff;padding:10px 20px;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.08)">
     <span style="font-size:13px;color:#666;font-weight:600">曲线：</span>
     <label style="font-size:12px;cursor:pointer"><input type="checkbox" id="m2ckGovSpot" checked onchange="renderMode2Charts()"> 国债即期</label>
     <label style="font-size:12px;cursor:pointer"><input type="checkbox" id="m2ckGovYtm" onchange="renderMode2Charts()"> 国债到期</label>
@@ -186,7 +186,7 @@ td.warn{background:#fff3cd}
     </span>
   </div>
 
-  <div class="chart-grid">
+  <div id="m2Cards" class="chart-grid" style="display:none">
 
     <!-- ═══ 卡片1：不同曲线同期对比 ═══ -->
     <div class="chart-card" style="grid-column:1/-1">
@@ -249,10 +249,23 @@ td.warn{background:#fff3cd}
     </div>
 
   </div>
+
+  <!-- 加载按钮 -->
+  <div id="m2LoadBox" style="text-align:center;padding:60px 0">
+    <button onclick="loadMode2()" style="padding:12px 36px;font-size:16px;background:#2e75b6;color:#fff;border:none;border-radius:8px;cursor:pointer">🔄 加载模式二数据</button>
+    <p style="color:#999;margin-top:12px;font-size:13px">点击后将加载国开债、国债到期等补充数据以渲染全部卡片</p>
+  </div>
+  <div id="m2LoadingTip" style="display:none;text-align:center;padding:60px 0;color:#e74c3c;font-size:15px">⏳ 数据加载中...</div>
 </div>
 
 <!-- ═══════════ 模式三：预定利率动态追踪 ═══════════ -->
 <div class="mode-content" id="mode3">
+  <!-- 加载按钮 -->
+  <div id="m3LoadBox" style="text-align:center;padding:60px 0">
+    <button onclick="loadMode3()" style="padding:12px 36px;font-size:16px;background:#27ae60;color:#fff;border:none;border-radius:8px;cursor:pointer">🔄 加载模式三数据并计算</button>
+    <p style="color:#999;margin-top:12px;font-size:13px">点击后将加载到期收益率数据，计算税收溢价、基础回报水平、走廊中值及分段调节</p>
+  </div>
+  <div id="m3Content" style="display:none">
   <div class="summary-grid" id="m3Summary"></div>
   <div class="chart-grid">
     <div class="chart-card">
@@ -286,6 +299,7 @@ td.warn{background:#fff3cd}
       <div id="m3TableDeposit"></div>
     </div>
   </div>
+  </div><!-- m3Content -->
 </div>
 
 <div class="footer">数据来源：中国债券信息网 (yield.chinabond.com.cn) ｜ 自动更新于每日17:30</div>
@@ -419,13 +433,27 @@ function switchMode(mode) {
   document.getElementById(mode).classList.add('active');
   // 模式一显示曲线选择，模式二三隐藏
   document.getElementById('toolbarCurve').style.display = mode === 'mode1' ? '' : 'none';
-  if (mode === 'mode2') preloadMode2();
-  renderAll();
+  if (mode === 'mode1') renderAll();
 }
 
 // ── 预加载模式二常用数据 ──
 function preloadMode2() {
   ['cdb_spot'].forEach(k => { if (!allData[k]) ensureData(k); });
+}
+
+// ── 模式二加载按钮 ──
+function loadMode2() {
+  document.getElementById('m2LoadBox').style.display = 'none';
+  document.getElementById('m2LoadingTip').style.display = '';
+  preloadMode2();
+  renderAll();
+}
+
+// ── 模式三加载按钮 ──
+function loadMode3() {
+  document.getElementById('m3LoadBox').style.display = 'none';
+  document.getElementById('m3Content').style.display = '';
+  renderAll();
 }
 
 // ── 工具函数 ──
@@ -503,10 +531,6 @@ async function init() {
   
   renderAll();
   setTimeout(initExtrapDate, 200);
-  // Background preload all remaining curves for instant tab switching
-  setTimeout(() => {
-    Object.keys(LAZY_FILES).forEach(k => { if (!allData[k]) ensureData(k); });
-  }, 500);
 }
 
 function refresh() {
@@ -1092,6 +1116,10 @@ function computeExtrapolation() {
 //  模式二：当日线相关分析
 // ═══════════════════════════════════════════════
 function renderMode2(data, row, prevRow, lastMonthRow) {
+  // Show toolbar and cards, hide loading
+  document.getElementById('m2LoadingTip').style.display = 'none';
+  document.getElementById('m2Toolbar').style.display = 'flex';
+  document.getElementById('m2Cards').style.display = '';
   renderMode2Charts();
 }
 
