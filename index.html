@@ -170,9 +170,9 @@ td.warn{background:#fff3cd}
   <div style="max-width:1400px;margin:0 auto 12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;background:#fff;padding:10px 20px;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.08)">
     <span style="font-size:13px;color:#666;font-weight:600">曲线：</span>
     <label style="font-size:12px;cursor:pointer"><input type="checkbox" id="m2ckGovSpot" checked onchange="renderMode2Charts()"> 国债即期</label>
-    <label style="font-size:12px;cursor:pointer"><input type="checkbox" id="m2ckGovYtm" checked onchange="renderMode2Charts()"> 国债到期</label>
-    <label style="font-size:12px;cursor:pointer"><input type="checkbox" id="m2ckCdbSpot" checked onchange="renderMode2Charts()"> 国开即期</label>
-    <label style="font-size:12px;cursor:pointer"><input type="checkbox" id="m2ckCdbYtm" checked onchange="renderMode2Charts()"> 国开到期</label>
+    <label style="font-size:12px;cursor:pointer"><input type="checkbox" id="m2ckGovYtm" onchange="renderMode2Charts()"> 国债到期</label>
+    <label style="font-size:12px;cursor:pointer"><input type="checkbox" id="m2ckCdbSpot" onchange="renderMode2Charts()"> 国开即期</label>
+    <label style="font-size:12px;cursor:pointer"><input type="checkbox" id="m2ckCdbYtm" onchange="renderMode2Charts()"> 国开到期</label>
     <label style="font-size:12px;cursor:pointer"><input type="checkbox" id="m2ckAdbc" onchange="renderMode2Charts()"> 农发债</label>
     <label style="font-size:12px;cursor:pointer"><input type="checkbox" id="m2ckExim" onchange="renderMode2Charts()"> 进出口行债</label>
     <label style="font-size:12px;cursor:pointer"><input type="checkbox" id="m2ckCorp" onchange="renderMode2Charts()"> 企业债AAA</label>
@@ -1116,13 +1116,18 @@ function renderMode2Charts() {
   // Lazy load new curves if needed
   const needed = curves.filter(c => LAZY_FILES[c.key]).filter(c => !allData[c.key]);
   if (needed.length > 0) {
+    // Show loading on all 6 chart doms
+    ['m2Chart1','m2Chart2','m2Chart3','m2Chart4','m2Chart5','m2Chart1b'].forEach(id => {
+      const d = document.getElementById(id);
+      if (!d) return;
+      let c = echarts.getInstanceByDom(d);
+      if (c) c.dispose();
+      c = echarts.init(d);
+      c.setOption({title:{text:'加载 ' + needed.map(n=>n.name).join('、') + ' ...',left:'center',top:'center',textStyle:{color:'#999',fontSize:14}}});
+    });
     Promise.all(needed.map(c =>
       fetch(`${LAZY_FILES[c.key]}?t=${Date.now()}`).then(r => r.json()).then(d => { allData[c.key] = d; })
     )).then(() => renderMode2Charts());
-    // Show loading
-    const dom = document.getElementById('m2Chart1');
-    const chart = echarts.getInstanceByDom(dom) || echarts.init(dom);
-    chart.setOption({title:{text:'正在加载新曲线数据...',left:'center',top:'center',textStyle:{color:'#999'}}});
     return;
   }
   
