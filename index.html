@@ -1087,9 +1087,27 @@ function exportCardFromChart(domId, sheetName) {
   if (!chart) return;
   const opt = chart.getOption();
   const series = opt.series || [];
-  const cols = ['期限/日期', ...series.filter(s=>s.data).map(s=>s.name)];
-  const xData = opt.xAxis[0].data || [];
-  const rows = xData.map((x,i) => [x, ...series.filter(s=>s.data).map(s=>s.data[i]!=null?s.data[i]:'')]);
+  const isTimeAxis = opt.xAxis[0].type === 'time';
+  const cols = [isTimeAxis ? '日期' : '期限', ...series.filter(s=>s.data).map(s=>s.name)];
+  const rows = [];
+  if (isTimeAxis) {
+    const firstSeries = series.find(s => s.data && s.data.length);
+    if (!firstSeries) return;
+    rows.push(...firstSeries.data.map((pt,i) => {
+      const d = pt instanceof Array ? pt[0] : '';
+      const dateStr = typeof d === 'string' ? d : new Date(d).toISOString().slice(0,10);
+      return [dateStr, ...series.filter(s=>s.data).map(s=>{
+        const p = s.data[i];
+        return (p instanceof Array && p[1]!=null) ? p[1] : (typeof p==='number'?p:'');
+      })];
+    }));
+  } else {
+    const xData = opt.xAxis[0].data || [];
+    rows.push(...xData.map((x,i) => [x, ...series.filter(s=>s.data).map(s=>{
+      const v = s.data[i];
+      return (v instanceof Array && v[1]!=null) ? v[1] : (v!=null?v:'');
+    })]));
+  }
   const ws = XLSX.utils.aoa_to_sheet([cols, ...rows]);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, sheetName);
@@ -1169,7 +1187,7 @@ function renderMode2Charts() {
     chart.setOption({
       tooltip:{trigger:'axis'}, legend:{data:series.map(s=>s.name), top:5},
       grid:{left:50, right:20, top:40, bottom:25},
-      xAxis:{type:'category', data:terms.map(t=>t.replace('Y','')), name:'期限(年)', nameGap:25},
+      xAxis:{type:'category', data:terms.map(t=>t.replace('Y','')), name:'期限(年)', nameGap:25, axisLabel:{interval:0}},
       yAxis:{type:'value',name:'%',axisLabel:{formatter:v=>v.toFixed(1)}},
       series
     });
@@ -1195,7 +1213,7 @@ function renderMode2Charts() {
       chartB.setOption({
         tooltip:{trigger:'axis', formatter:p=>p[0]?`${p[0].axisValue}年<br/>${aName}−${bName}: ${p[0].value}bp`:''},
         grid:{left:50, right:20, top:30, bottom:25},
-        xAxis:{type:'category', data:terms.map(t=>t.replace('Y','')), name:'期限(年)', nameGap:25},
+        xAxis:{type:'category', data:terms.map(t=>t.replace('Y','')), name:'期限(年)', nameGap:25, axisLabel:{interval:0}},
         yAxis:{type:'value', name:'bp'},
         series:[{
           name:`${aName} − ${bName}`, type:'bar', data:spreads,
@@ -1225,10 +1243,11 @@ function renderMode2Charts() {
     }
     chart.setOption({
       tooltip:{trigger:'axis'}, grid:{left:55,right:20,top:30,bottom:40},
-      xAxis:{type:'category', data:dates.map(d=>d.slice(0,7)), axisLabel:{rotate:45,fontSize:9,interval:Math.floor(dates.length/12)}},
+      xAxis:{type:'time', axisLabel:{formatter:'{yyyy}-{MM}', rotate:45, fontSize:9}},
       yAxis:{type:'value',name:'bp'},
       series:[{
-        name:'9Y税收溢价', type:'line', data:premiums, symbol:'none', areaStyle:{color:'rgba(231,76,60,0.1)'},
+        name:'9Y税收溢价', type:'line', symbol:'none', areaStyle:{color:'rgba(231,76,60,0.1)'},
+        data: dates.map((d,i) => [d, premiums[i]]),
         lineStyle:{color:'#e74c3c',width:1.5},
         markLine:{silent:true,data:[{type:'average',name:'均值'}],lineStyle:{color:'#888',type:'dashed'}}
       }]
@@ -1305,7 +1324,7 @@ function renderM2Card3() {
     }},
     legend:{data:[`基准日 ${baseDate}`,`对比日 ${compDate}`], top:5},
     grid:{left:50,right:20,top:40,bottom:25},
-    xAxis:{type:'category', data:terms.map(t=>t.replace('Y','')), name:'期限(年)', nameGap:25},
+    xAxis:{type:'category', data:terms.map(t=>t.replace('Y','')), name:'期限(年)', nameGap:25, axisLabel:{interval:0}},
     yAxis:{type:'value',name:'%',axisLabel:{formatter:v=>v.toFixed(1)}},
     series:[
       {name:`基准日 ${baseDate}`, type:'line', smooth:true, symbol:'none',
@@ -1321,7 +1340,7 @@ function renderM2Card3() {
   chartB.setOption({
     tooltip:{trigger:'axis', formatter:p=>p[0]?`${p[0].axisValue}年<br/>利差: ${p[0].value}bp`:''},
     grid:{left:50, right:20, top:25, bottom:25},
-    xAxis:{type:'category', data:terms.map(t=>t.replace('Y','')), name:'期限(年)', nameGap:25},
+    xAxis:{type:'category', data:terms.map(t=>t.replace('Y','')), name:'期限(年)', nameGap:25, axisLabel:{interval:0}},
     yAxis:{type:'value', name:'bp'},
     series:[{
       name:`${baseDate} − ${compDate}`, type:'bar', data:diffs,
@@ -1353,9 +1372,12 @@ function renderM2Card4() {
   chart.setOption({
     tooltip:{trigger:'axis'},
     grid:{left:55,right:20,top:30,bottom:40},
-    xAxis:{type:'category',data:dates.map(d=>d.slice(0,7)),axisLabel:{rotate:45,fontSize:9,interval:Math.floor(dates.length/12)}},
+    xAxis:{type:'time', axisLabel:{formatter:'{yyyy}-{MM}', rotate:45, fontSize:9}},
     yAxis:{type:'value',name:'%',axisLabel:{formatter:v=>v.toFixed(2)}},
-    series:[{name:'10Y',type:'line',data:values,symbol:'none',areaStyle:{color:'rgba(46,117,182,0.08)'},lineStyle:{color:'#2e75b6',width:1.5}}]
+    series:[{name:'10Y',type:'line',symbol:'none',areaStyle:{color:'rgba(46,117,182,0.08)'},
+      data: dates.map((d,i) => [d, values[i]]),
+      lineStyle:{color:'#2e75b6',width:1.5}
+    }]
   });
 }
 
@@ -1387,10 +1409,11 @@ function renderM2Card5() {
   chart.setOption({
     tooltip:{trigger:'axis'},
     grid:{left:55,right:20,top:30,bottom:40},
-    xAxis:{type:'category',data:dates.map(d=>d.slice(0,7)),axisLabel:{rotate:45,fontSize:9,interval:Math.floor(dates.length/12)}},
+    xAxis:{type:'time', axisLabel:{formatter:'{yyyy}-{MM}', rotate:45, fontSize:9}},
     yAxis:{type:'value',name:'bp'},
     series:[{
-      name:'AAA-国开溢价(10Y)',type:'line',data:spreads,symbol:'none',areaStyle:{color:'rgba(142,68,173,0.1)'},
+      name:'AAA-国开溢价(10Y)',type:'line',symbol:'none',areaStyle:{color:'rgba(142,68,173,0.1)'},
+      data: dates.map((d,i) => [d, spreads[i]]),
       lineStyle:{color:'#8e44ad',width:1.5},
       markLine:{silent:true,data:[{type:'average',name:'均值'}],lineStyle:{color:'#888',type:'dashed'}}
     }]
