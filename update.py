@@ -219,12 +219,11 @@ def main():
     
     generate_summary()
     
-    # 生成版本号文件（用于前端缓存破坏）
-    version_str = datetime.now(BJ_TZ).strftime('%Y%m%d%H%M%S')
-    save_json(VERSION_FILE, {"version": version_str, "date": today_str})
-    
     # 如果有新数据，推送到 GitHub Pages
     if any([ok1, ok2, ok3, ok4]):
+        # 生成新版本号（只有数据真变了才更新，避免无意义缓存失效）
+        version_str = datetime.now(BJ_TZ).strftime('%Y%m%d%H%M%S')
+        save_json(VERSION_FILE, {"version": version_str, "date": today_str})
         print("\n────────────────────────────────────────")
         print(" [Git] 推送更新到 GitHub Pages")
         import subprocess
