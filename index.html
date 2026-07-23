@@ -82,13 +82,13 @@ td.warn{background:#fff3cd}
 
 <!-- ═══════════ 工具栏（所有模式共用） ═══════════ -->
 <div class="toolbar">
-  <label>曲线：</label>
+  <span id="toolbarCurve"><label>曲线：</label>
   <select id="curveSelect">
     <option value="gov_spot">国债即期</option>
     <option value="cdb_spot">国开债即期</option>
     <option value="gov_ytm">国债到期</option>
     <option value="cdb_ytm">国开债到期</option>
-  </select>
+  </select></span>
   <label>基准日：</label>
   <input type="date" id="datePicker">
   <button onclick="refresh()">刷新</button>
@@ -417,6 +417,8 @@ function switchMode(mode) {
   document.querySelector(`[data-mode="${mode}"]`).classList.add('active');
   document.querySelectorAll('.mode-content').forEach(c => c.classList.remove('active'));
   document.getElementById(mode).classList.add('active');
+  // 模式一显示曲线选择，模式二三隐藏
+  document.getElementById('toolbarCurve').style.display = mode === 'mode1' ? '' : 'none';
   if (mode === 'mode2') preloadMode2();
   renderAll();
 }
