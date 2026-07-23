@@ -210,6 +210,11 @@ td.warn{background:#fff3cd}
       <div id="m3TableCoeff"></div>
     </div>
     <div class="chart-card">
+      <h2>🏦 5年期定存利率调整历史</h2>
+      <div class="card-desc">工商银行整存整取5年期挂牌利率调整节点。每次调整均为六大行同步调息。<b>如需更新：联系管理员修改 data_deposit5y.json。</b></div>
+      <div id="m3TableDeposit"></div>
+    </div>
+    <div class="chart-card">
       <h2>📅 预定利率基准 N 历史走势</h2>
       <div class="card-desc">N = 基础回报水平 × 分段调节系数。为寿险产品预定利率的基准参照，叠加10Y国债走势便于对比实际市场利率与监管基准的差异。</div>
       <div class="chart" id="m3ChartN"></div>
@@ -390,6 +395,15 @@ async function init() {
     try { const resp = await fetch(url); allData[key] = await resp.json(); }
     catch(e) { console.warn(`加载 ${file} 失败:`, e); }
   });
+  // 额外加载 LPR 和定存数据
+  promises.push((async () => {
+    try { const r = await fetch(`data_lpr5y.json?t=${Date.now()}`); allData.lpr5y = await r.json(); }
+    catch(e) { console.warn('LPR加载失败:', e); }
+  })());
+  promises.push((async () => {
+    try { const r = await fetch(`data_deposit5y.json?t=${Date.now()}`); allData.deposit5y = await r.json(); }
+    catch(e) { console.warn('定存加载失败:', e); }
+  })());
   await Promise.all(promises);
   
   if (allData.gov_spot && allData.gov_spot.dates.length > 0) {
@@ -1121,6 +1135,29 @@ function renderMode3(data, row) {
     <tr><td>(1%, 2%]</td><td>100%</td><td>1.0</td><td>1.0</td><td>低位：完全暴露</td></tr>
     <tr><td>1% 以下</td><td>100%</td><td>0</td><td>0</td><td>临界：不设防</td></tr>
   </table>`;
+
+  // 5年期定存利率调整历史
+  const deposit = allData.deposit5y;
+  if (deposit && deposit.dates && deposit.dates.length > 0) {
+    let rows = '';
+    for (let i = deposit.dates.length - 1; i >= 0; i--) {
+      const prevVal = i > 0 ? deposit.values[i - 1] : null;
+      const change = prevVal !== null ? (deposit.values[i] - prevVal).toFixed(2) : '—';
+      const changeClass = change > 0 ? 'up' : (change < 0 ? 'down' : '');
+      rows += `<tr>
+        <td>${deposit.dates[i]}</td>
+        <td><b>${deposit.values[i].toFixed(2)}%</b></td>
+        <td class="${changeClass}">${change !== '—' ? (change > 0 ? '+' : '') + change + 'pp' : '—'}</td>
+        <td style="font-size:11px;color:#888">${i === deposit.dates.length - 1 ? '← 当前' : ''}</td>
+      </tr>`;
+    }
+    document.getElementById('m3TableDeposit').innerHTML = `<table>
+      <tr><th>调整日期</th><th>5年期利率</th><th>变动</th><th></th></tr>
+      ${rows}
+    </table>`;
+  } else {
+    document.getElementById('m3TableDeposit').innerHTML = '<p style="color:#999;text-align:center;padding:20px">数据加载中...</p>';
+  }
   
   // 走廊占位图
   ['m3ChartCorridor','m3ChartBase','m3ChartN'].forEach(id => {
