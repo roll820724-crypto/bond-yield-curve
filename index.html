@@ -205,7 +205,7 @@ td.warn{background:#fff3cd}
     <!-- ═══ 卡片3：期限结构对比（双日期） ═══ -->
     <div class="chart-card">
       <h2>🔄 期限结构对比 <button onclick="exportCardFromChart('m2Chart3','期限结构对比')" style="font-size:11px;background:#2e75b6;color:#fff;border:none;border-radius:3px;padding:2px 8px;cursor:pointer;float:right;margin-top:-3px">📥底稿</button></h2>
-      <div class="card-desc">同一曲线在两个时点上的期限结构差异。下方表格列示各期限利差（基准日 − 对比日，bp），正值表示基准日利率更高。</div>
+      <div class="card-desc">同一曲线在两个时点上的期限结构差异（上图）。下方柱状图展示全期限利差（基准日 − 对比日，bp），正值表示基准日利率更高。</div>
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
         <select id="m2s3Curve" onchange="renderM2Card3()" style="font-size:12px;padding:3px 6px">
           <option value="gov_spot">国债即期</option><option value="gov_ytm">国债到期</option>
@@ -215,7 +215,8 @@ td.warn{background:#fff3cd}
         <label style="font-size:11px">基准日:<input type="date" id="m2d3Base" onchange="renderM2Card3()" style="font-size:11px;padding:2px"></label>
         <label style="font-size:11px">对比日:<input type="date" id="m2d3Comp" onchange="renderM2Card3()" style="font-size:11px;padding:2px"></label>
       </div>
-      <div class="chart" id="m2Chart3" style="height:360px"></div>
+      <div class="chart" id="m2Chart3" style="height:300px"></div>
+      <div class="chart" id="m2Chart3b" style="height:150px"></div>
     </div>
 
     <!-- ═══ 卡片4：10年期走势 ═══ -->
@@ -1255,21 +1256,19 @@ function renderM2Card3() {
     ]
   });
   
-  // 下方利差明细表
-  const card = dom.parentElement;
-  let oldTable = card.querySelector('.spread-table');
-  if (oldTable) oldTable.remove();
-  const tbl = document.createElement('table');
-  tbl.className = 'spread-table';
-  tbl.style.cssText = 'margin-top:8px;font-size:11px';
-  let tbody = `<tr><th>期限</th><th>基准日(%)</th><th>对比日(%)</th><th>利差(bp)</th></tr>`;
-  for (let i=0;i<terms.length;i++) {
-    const d=diffs[i];
-    tbody += `<tr><td>${terms[i]}</td><td>${line1[i].toFixed(4)}</td><td>${line2[i]!=null?line2[i].toFixed(4):'—'}</td>
-      <td class="${d>0?'up':'down'}">${d!=null?(d>0?'+':'')+d.toFixed(1):'—'}</td></tr>`;
-  }
-  tbl.innerHTML = tbody;
-  card.appendChild(tbl);
+  // 利差独立柱状图
+  const domB = document.getElementById('m2Chart3b');
+  const chartB = echarts.init(domB);
+  chartB.setOption({
+    tooltip:{trigger:'axis', formatter:p=>p[0]?`${p[0].axisValue}年<br/>利差: ${p[0].value}bp`:''},
+    grid:{left:50, right:20, top:25, bottom:25},
+    xAxis:{type:'category', data:terms.map(t=>t.replace('Y','')), name:'期限(年)', nameGap:25},
+    yAxis:{type:'value', name:'bp'},
+    series:[{
+      name:`${baseDate} − ${compDate}`, type:'bar', data:diffs,
+      itemStyle:{color:params=>params.value>=0?'#c0392b':'#27ae60'}
+    }]
+  });
 }
 
 function renderM2Card4() {
