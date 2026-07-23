@@ -176,6 +176,7 @@ td.warn{background:#fff3cd}
     <label style="font-size:12px;cursor:pointer"><input type="checkbox" id="m2ckAdbc" onchange="renderMode2Charts()"> 农发债</label>
     <label style="font-size:12px;cursor:pointer"><input type="checkbox" id="m2ckExim" onchange="renderMode2Charts()"> 进出口行债</label>
     <label style="font-size:12px;cursor:pointer"><input type="checkbox" id="m2ckCorp" onchange="renderMode2Charts()"> 企业债AAA</label>
+    <label style="font-size:12px;cursor:pointer"><input type="checkbox" id="m2ckInsurer" onchange="renderMode2Charts()"> 保险资本补充债</label>
     <span style="margin-left:16px">|</span>
     <label style="font-size:12px;cursor:pointer"><input type="checkbox" id="m2ckSpread" onchange="renderMode2Charts()"> 显示利差</label>
     <span id="m2SpreadCtrls" style="display:none">
@@ -211,7 +212,7 @@ td.warn{background:#fff3cd}
         <select id="m2s3Curve" onchange="renderM2Card3()" style="font-size:12px;padding:3px 6px">
           <option value="gov_spot">国债即期</option><option value="gov_ytm">国债到期</option>
           <option value="cdb_spot">国开即期</option><option value="cdb_ytm">国开到期</option>
-          <option value="adbc">农发债</option><option value="exim">进出口行债</option><option value="corp_aaa">企业债AAA</option>
+          <option value="adbc">农发债</option><option value="exim">进出口行债</option><option value="corp_aaa">企业债AAA</option><option value="insurer">保险资本补充债</option>
         </select>
         <label style="font-size:11px">基准日:<input type="date" id="m2d3Base" onchange="renderM2Card3()" style="font-size:11px;padding:2px"></label>
         <label style="font-size:11px">对比日:<input type="date" id="m2d3Comp" onchange="renderM2Card3()" style="font-size:11px;padding:2px"></label>
@@ -228,7 +229,7 @@ td.warn{background:#fff3cd}
         <select id="m2s4Curve" onchange="renderM2Card4()" style="font-size:12px;padding:3px 6px">
           <option value="gov_spot">国债即期</option><option value="gov_ytm">国债到期</option>
           <option value="cdb_spot">国开即期</option><option value="cdb_ytm">国开到期</option>
-          <option value="adbc">农发债</option><option value="exim">进出口行债</option><option value="corp_aaa">企业债AAA</option>
+          <option value="adbc">农发债</option><option value="exim">进出口行债</option><option value="corp_aaa">企业债AAA</option><option value="insurer">保险资本补充债</option>
         </select>
         <label style="font-size:11px">起始:<input type="date" id="m2d4Start" onchange="renderM2Card4()" style="font-size:11px;padding:2px"></label>
         <label style="font-size:11px">终止:<input type="date" id="m2d4End" onchange="renderM2Card4()" style="font-size:11px;padding:2px"></label>
@@ -297,9 +298,10 @@ const DATA_FILES = {
 };
 const LAZY_FILES = {
   cdb_spot: 'data_cdb.json', gov_ytm: 'data_gov_ytm.json', cdb_ytm: 'data_cdb_ytm.json',
-  corp_aaa: 'data_corp_aaa.json', adbc: 'data_adbc.json', exim: 'data_exim.json'
+  corp_aaa: 'data_corp_aaa.json', adbc: 'data_adbc.json', exim: 'data_exim.json',
+  insurer: 'data_insurer.json'
 };
-const CURVE_NAMES = { gov_spot:'国债即期', cdb_spot:'国开债即期', gov_ytm:'国债到期', cdb_ytm:'国开债到期', corp_aaa:'企业债AAA', adbc:'农发债', exim:'进出口行债' };
+const CURVE_NAMES = { gov_spot:'国债即期', cdb_spot:'国开债即期', gov_ytm:'国债到期', cdb_ytm:'国开债到期', corp_aaa:'企业债AAA', adbc:'农发债', exim:'进出口行债', insurer:'保险资本补充债AA+' };
 const KEY_TERMS = ['1Y','3Y','5Y','7Y','10Y','15Y','20Y','30Y','50Y'];
 
 let allData = {};
@@ -1122,6 +1124,7 @@ const M2_CURVES = [
   {key:'adbc', name:'农发债', color:'#e67e22', ck:'m2ckAdbc'},
   {key:'exim', name:'进出口行债', color:'#1abc9c', ck:'m2ckExim'},
   {key:'corp_aaa', name:'企业债AAA', color:'#f39c12', ck:'m2ckCorp'},
+  {key:'insurer', name:'保险公司资本补充债AA+', color:'#3498db', ck:'m2ckInsurer'},
 ];
 
 function getCheckedCurves() {
