@@ -40,6 +40,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Microsoft YaHei',s
 .chart-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(520px,1fr));gap:16px;max-width:1400px;margin:0 auto}
 .chart-card{background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.08);padding:16px 20px}
 .chart-card h2{font-size:15px;color:#1a3c6e;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid #2e75b6}
+.card-desc{font-size:11px;color:#888;margin:-4px 0 10px 0;line-height:1.5}
 .chart{width:100%;height:360px}
 
 /* ── 表格 ── */
@@ -102,22 +103,27 @@ td.warn{background:#fff3cd}
   <div class="chart-grid">
     <div class="chart-card">
       <h2>📉 收益率曲线（即期 vs 750MA） <button onclick="exportCurve750()" style="float:right;font-size:10px;padding:1px 6px;background:#2e75b6;color:#fff;border:none;border-radius:3px;cursor:pointer">📥底稿</button></h2>
+      <div class="card-desc">虚线为过去750个交易日移动平均（750MA）。实线上穿虚线→利率高于历史均值（债券相对便宜）；下穿→利率偏低（债券相对偏贵）。</div>
       <div class="chart" id="m1ChartCurve"></div>
     </div>
     <div class="chart-card">
       <h2>📊 期限利差走势（750） <select id="spreadRange" onchange="onSpreadRangeChange()" style="font-size:11px;padding:1px 4px;margin-left:8px"><option value="1y">过去1年</option><option value="3y">过去3年</option><option value="all" selected>全部</option></select> <button onclick="exportSpread()" style="float:right;font-size:10px;padding:1px 6px;background:#2e75b6;color:#fff;border:none;border-radius:3px;cursor:pointer">📥底稿</button></h2>
+      <div class="card-desc">基于各期限750MA计算的关键利差历史走势。10Y-1Y=期限溢价，30Y-10Y=超长端定价，5Y-1Y=中短端陡峭程度。利差收窄通常预示经济预期走弱。</div>
       <div class="chart" id="m1ChartSpread"></div>
     </div>
     <div class="chart-card">
       <h2>📋 关键期限 vs 750MA 偏离 <button onclick="exportKeyTerms()" style="float:right;font-size:10px;padding:1px 6px;background:#2e75b6;color:#fff;border:none;border-radius:3px;cursor:pointer">📥底稿</button></h2>
+      <div class="card-desc">各关键期限当日收益率与其750MA的偏离幅度（bp）。正值=高于均值，负值=低于均值。日变动/月变动反映偏离收敛或扩大的方向。</div>
       <div id="m1TableKey"></div>
     </div>
     <div class="chart-card">
       <h2>📅 10Y 实际 vs 750MA ±1.96σ <button onclick="exportHistory()" style="float:right;font-size:10px;padding:1px 6px;background:#2e75b6;color:#fff;border:none;border-radius:3px;cursor:pointer">📥底稿</button></h2>
+      <div class="card-desc">10年期国债收益率历史走势叠加750MA及±1.96σ置信带（≈95%置信区间）。🟢=正常范围，🟠=利率显著偏低（债券偏贵），🔵=利率显著偏高（债券便宜）。数据自2019-06-30起（750MA需完整暖机期）。</div>
       <div class="chart" id="m1ChartHistory"></div>
     </div>
     <div class="chart-card">
       <h2>🔄 不同评估时点750对比 <button onclick="exportComparison()" style="float:right;font-size:10px;padding:1px 6px;background:#2e75b6;color:#fff;border:none;border-radius:3px;cursor:pointer">📥底稿</button></h2>
+      <div class="card-desc">选择两个评估日期，对比各关键期限及1-20Y等权平均值的750MA差异。变动=选择时点−参考时点，正=上升（bp）。服务于准备金评估时点切换的折现率变动分析。</div>
       <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
         <label style="font-size:12px">选择时点：</label>
         <input type="date" id="m1DateA" style="font-size:12px;padding:2px 4px" onchange="renderMode1Comparison()">
@@ -128,6 +134,10 @@ td.warn{background:#fff3cd}
     </div>
     <div class="chart-card">
       <h2>📈 曲线外推：750MA预测 <button onclick="exportExtrapolation()" style="float:right;font-size:10px;padding:1px 6px;background:#2e75b6;color:#fff;border:none;border-radius:3px;cursor:pointer">📥底稿</button></h2>
+      <div class="card-desc">假设未来曲线按所选规则演变，推算未来12个季度末的750MA走势，用于准备金折现率前瞻预测。<br>
+      <b>基于日期</b>：未来每日曲线恒等于选定日曲线，向前滚动计算750MA。最简单直观，适合"当前利率环境持续"场景。<br>
+      <b>基于中枢</b>：输入目标10Y中枢值(%)，系统在历史中匹配10Y最接近该值的日期(±1bp)，用该日完整曲线外推。反映不同利率环境下的曲线形态差异。<br>
+      <b>基于利差</b>：以对比基准日曲线形状为底，全线平移至目标10Y水平。保持期限结构形状不变，仅改变水平位置。适合仅调整利率水平、不改变形态的场景。</div>
       <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
         <label style="font-size:12px"><input type="radio" name="extrapMethod" value="date" checked onchange="onExtrapMethodChange()"> 基于日期</label>
         <label style="font-size:12px"><input type="radio" name="extrapMethod" value="pivot" onchange="onExtrapMethodChange()"> 基于中枢</label>
@@ -159,18 +169,22 @@ td.warn{background:#fff3cd}
   <div class="chart-grid">
     <div class="chart-card">
       <h2>📉 即期收益率曲线（四条对比）</h2>
+      <div class="card-desc">同一日期四条曲线的叠加对比。国债即期 vs 国开即期=信用溢价，即期 vs 到期=息票效应差异。曲线越陡峭→期限溢价越高。</div>
       <div class="chart" id="m2ChartSpot"></div>
     </div>
     <div class="chart-card">
       <h2>💳 信用溢价（国开-国债利差）</h2>
+      <div class="card-desc">国开债即期收益率减去同期限国债即期收益率（bp）。反映政策性银行信用风险定价，溢价走阔通常对应信用环境收紧。</div>
       <div class="chart" id="m2ChartCredit"></div>
     </div>
     <div class="chart-card">
       <h2>📋 关键期限即期收益率</h2>
+      <div class="card-desc">各关键期限即期与到期收益率，含即期-到期差（bp）。底部标注曲线形态：陡峭/平坦/倒挂。</div>
       <div id="m2TableKey"></div>
     </div>
     <div class="chart-card">
       <h2>📅 信用溢价历史走势</h2>
+      <div class="card-desc">10年期国开-国债即期利差时间序列，虚线为历史均值。利差高于均值→信用环境偏紧，低于均值→信用环境宽松。</div>
       <div class="chart" id="m2ChartCreditHistory"></div>
     </div>
   </div>
@@ -182,18 +196,22 @@ td.warn{background:#fff3cd}
   <div class="chart-grid">
     <div class="chart-card">
       <h2>🏦 利率走廊</h2>
+      <div class="card-desc">LPR上限与定期存款下限构成的利率走廊，走廊中值6MMA为预定利率调节的参照锚。走廊持续下移→预定利率存在下调空间。</div>
       <div class="chart" id="m3ChartCorridor"></div>
     </div>
     <div class="chart-card">
       <h2>📊 基础回报水平</h2>
+      <div class="card-desc">10年期国债收益率叠加税收溢价构成的基础回报水平。250MA与750MA双均线分别反映中短期和长期趋势，两者的相对位置辅助判断利率方向。</div>
       <div class="chart" id="m3ChartBase"></div>
     </div>
     <div class="chart-card">
       <h2>📋 分段调节系数表</h2>
+      <div class="card-desc">基于基础回报水平所处区间，对应不同的调节系数。7段调节机制确保预定利率调整平滑有序，避免频繁大幅波动。</div>
       <div id="m3TableCoeff"></div>
     </div>
     <div class="chart-card">
       <h2>📅 预定利率基准 N 历史走势</h2>
+      <div class="card-desc">N = 基础回报水平 × 分段调节系数。为寿险产品预定利率的基准参照，叠加10Y国债走势便于对比实际市场利率与监管基准的差异。</div>
       <div class="chart" id="m3ChartN"></div>
     </div>
   </div>
