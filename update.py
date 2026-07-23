@@ -218,6 +218,27 @@ def main():
     
     generate_summary()
     
+    # 如果有新数据，推送到 GitHub Pages
+    if any([ok1, ok2, ok3, ok4]):
+        print("\n────────────────────────────────────────")
+        print(" [Git] 推送更新到 GitHub Pages")
+        import subprocess
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        try:
+            subprocess.run(["git", "add", DATA_FILE, CDB_DATA_FILE, GOV_YTM_FILE, CDB_YTM_FILE, SUMMARY_FILE],
+                          cwd=script_dir, check=True, capture_output=True)
+            subprocess.run(["git", "commit", "-m", f"数据更新至{today_str}"],
+                          cwd=script_dir, check=True, capture_output=True)
+            subprocess.run(["git", "push", "origin", "main"],
+                          cwd=script_dir, check=True, capture_output=True, timeout=60)
+            print(" ✅ [Git] 推送成功")
+        except subprocess.CalledProcessError as e:
+            # git commit 在无变更时返回非零，正常
+            if "nothing to commit" in (e.stderr.decode() if e.stderr else ""):
+                print(" ⚠ [Git] 无新变更需要推送")
+            else:
+                print(f" ❌ [Git] 推送失败: {e}")
+    
     print(f"\n{'='*55}")
     results = [f"国债即期{'✅' if ok1 else '⚠'}", f"国开即期{'✅' if ok2 else '⚠'}",
                f"国债到期{'✅' if ok3 else '⚠'}", f"国开到期{'✅' if ok4 else '⚠'}"]
