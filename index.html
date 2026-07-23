@@ -434,6 +434,7 @@ function switchMode(mode) {
   // 模式一显示曲线选择，模式二三隐藏
   document.getElementById('toolbarCurve').style.display = mode === 'mode1' ? '' : 'none';
   if (mode === 'mode1') renderAll();
+  if (mode === 'mode2') { ensureData('cdb_spot').then(() => renderAll()); }
 }
 
 // ── 预加载模式二常用数据 ──
@@ -1116,7 +1117,8 @@ function computeExtrapolation() {
 //  模式二：当日线相关分析
 // ═══════════════════════════════════════════════
 function renderMode2(data, row, prevRow, lastMonthRow) {
-  // Show toolbar and cards, hide loading
+  // Show toolbar and cards, hide loading/load button
+  const lb = document.getElementById('m2LoadBox'); if (lb) lb.style.display = 'none';
   document.getElementById('m2LoadingTip').style.display = 'none';
   document.getElementById('m2Toolbar').style.display = 'flex';
   document.getElementById('m2Cards').style.display = '';
