@@ -503,6 +503,10 @@ async function init() {
   
   renderAll();
   setTimeout(initExtrapDate, 200);
+  // Background preload all remaining curves for instant tab switching
+  setTimeout(() => {
+    Object.keys(LAZY_FILES).forEach(k => { if (!allData[k]) ensureData(k); });
+  }, 500);
 }
 
 function refresh() {
