@@ -198,7 +198,8 @@ td.warn{background:#fff3cd}
     <!-- ═══ 卡片2：税收溢价 ═══ -->
     <div class="chart-card">
       <h2>💰 税收溢价（国开-国债 9Y即期） <button onclick="exportCardFromChart('m2Chart2','税收溢价')" style="font-size:11px;background:#2e75b6;color:#fff;border:none;border-radius:3px;padding:2px 8px;cursor:pointer;float:right;margin-top:-3px">📥底稿</button></h2>
-      <div class="card-desc">国开债9年期即期 − 国债9年期即期（bp）。反映国债免税优势的市场定价，是预定利率模型中税收溢价的核心输入。</div>
+      <div class="card-desc">国开债9年期即期 − 国债9年期即期（bp）。反映国债免税优势的市场定价。</div>
+      <div id="m2TaxSummary" style="margin-bottom:8px;font-size:12px;line-height:1.8"></div>
       <div class="chart" id="m2Chart2" style="height:360px"></div>
     </div>
 
@@ -1122,7 +1123,10 @@ function renderMode2Charts() {
 
   // ==== 卡片1：不同曲线期限结构对比 ====
   (function() {
-    const dom = document.getElementById('m2Chart1'); const chart = echarts.init(dom);
+    const dom = document.getElementById('m2Chart1');
+    let chart = echarts.getInstanceByDom(dom);
+    if (chart) chart.dispose();
+    chart = echarts.init(dom);
     const firstCurve = curves[0];
     const refData = getData(firstCurve.key), refRow = getRow(refData, selectedDate);
     const terms = refData.terms.filter(t => getTermValue(refRow, refData, t) != null && parseInt(t) >= 1);
@@ -1142,9 +1146,11 @@ function renderMode2Charts() {
 
     // 利差独立图
     const domB = document.getElementById('m2Chart1b');
+    let chartB = echarts.getInstanceByDom(domB);
+    if (chartB) chartB.dispose();
     if (showSpread && curves.length >= 2) {
       domB.style.display = '';
-      const chartB = echarts.init(domB);
+      chartB = echarts.init(domB);
       const aKey = document.getElementById('m2spA').value;
       const bKey = document.getElementById('m2spB').value;
       const aData = getData(aKey), bData = getData(bKey);
@@ -1196,7 +1202,29 @@ function renderMode2Charts() {
         markLine:{silent:true,data:[{type:'average',name:'均值'}],lineStyle:{color:'#888',type:'dashed'}}
       }]
     });
-    chart._exportData = {xData:dates, series:[{name:'日期', data:dates},{name:'9Y税收溢价(bp)', data:premiums}]};
+    // 季度末摘要
+    (function() {
+      const qEnds = []; // 找最近5个季度末
+      const now = new Date();
+      for (let q = 0; q < 5; q++) {
+        let m = now.getMonth() - q * 3;
+        let y = now.getFullYear();
+        while (m < 0) { m += 12; y--; }
+        const qEnd = new Date(y, m + 1, 0); // 当月最后一天
+        const dStr = qEnd.toISOString().slice(0,10);
+        // 找 <= dStr 且最近的交易日
+        let best = null;
+        for (let i = dates.length - 1; i >= 0; i--) {
+          if (dates[i] <= dStr && premiums[i] != null) { best = i; break; }
+        }
+        if (best != null) {
+          qEnds.push({label: q===0 ? '最新' : dates[best], date: dates[best], val: premiums[best]});
+        }
+      }
+      document.getElementById('m2TaxSummary').innerHTML = qEnds.map((q,i) =>
+        `<span style="margin-right:16px;color:#666">${q.label}: <b style="color:#e74c3c">${q.val}bp</b>${i===0?' ← 当前':''}</span>`
+      ).join('');
+    })();
   })();
 
   // ==== 卡片3：期限结构对比（双日期） ====
