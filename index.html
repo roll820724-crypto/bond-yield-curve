@@ -269,22 +269,22 @@ td.warn{background:#fff3cd}
   <div class="summary-grid" id="m3Summary"></div>
   <div class="chart-grid">
     <div class="chart-card">
-      <h2>🏦 利率走廊</h2>
+      <h2>🏦 利率走廊 <button onclick="exportCardFromChart('m3ChartCorridor','利率走廊')" style="font-size:11px;background:#2e75b6;color:#fff;border:none;border-radius:3px;padding:2px 8px;cursor:pointer;float:right;margin-top:-3px">📥底稿</button></h2>
       <div class="card-desc">上限=5Y LPR，下限=5Y定存(ICBC)，中值6月MA为预定利率参照锚。走廊持续下移→预定利率下调空间打开。</div>
       <div class="chart" id="m3ChartCorridor"></div>
     </div>
     <div class="chart-card">
-      <h2>💰 基础回报构建</h2>
+      <h2>💰 基础回报构建 <button onclick="exportCardFromChart('m3ChartBaseReturn','基础回报构建')" style="font-size:11px;background:#2e75b6;color:#fff;border:none;border-radius:3px;padding:2px 8px;cursor:pointer;float:right;margin-top:-3px">📥底稿</button></h2>
       <div class="card-desc">CGB 10Y到期 + 税收溢价(CDB 9Y到期 − CGB 9Y到期) = 基础回报。税收溢价反映国债免税优势。</div>
       <div class="chart" id="m3ChartBaseReturn"></div>
     </div>
     <div class="chart-card">
-      <h2>📈 基础回报水平</h2>
+      <h2>📈 基础回报水平 <button onclick="exportCardFromChart('m3ChartMALevel','基础回报水平')" style="font-size:11px;background:#2e75b6;color:#fff;border:none;border-radius:3px;padding:2px 8px;cursor:pointer;float:right;margin-top:-3px">📥底稿</button></h2>
       <div class="card-desc">基础回报的250MA与750MA。取MIN=基础回报水平，用于计算M。蓝色填充=250MA>750MA（短>长）区域。</div>
       <div class="chart" id="m3ChartMALevel"></div>
     </div>
     <div class="chart-card">
-      <h2>📊 参考利率M vs 预定利率N</h2>
+      <h2>📊 参考利率M vs 预定利率N <button onclick="exportCardFromChart('m3ChartMN','MN对比')" style="font-size:11px;background:#2e75b6;color:#fff;border:none;border-radius:3px;padding:2px 8px;cursor:pointer;float:right;margin-top:-3px">📥底稿</button></h2>
       <div class="card-desc">M = MIN(走廊中值6MMA, 基础回报水平)。N = 分段调节(M)。虚线为各段阈值。</div>
       <div class="chart" id="m3ChartMN"></div>
     </div>
