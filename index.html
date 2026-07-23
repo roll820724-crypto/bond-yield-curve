@@ -1586,7 +1586,7 @@ async function renderMode3(data, row) {
 
 // ── 从预计算数据渲染（秒开） ──
 function renderM3FromPrecomputed(pc) {
-  const dates = pc.dates;
+  try {  const dates = pc.dates;
   const N_SEGMENTS = [
     {hi:Infinity, lo:4.0, coef:0.20, base:null, threshold:4.0, label:'4%以上'},
     {hi:4.0, lo:3.5, coef:0.30, base:null, threshold:3.5, label:'(3.5%,4%]'},
@@ -1736,6 +1736,10 @@ function renderM3FromPrecomputed(pc) {
     document.getElementById('m3TableDeposit').innerHTML = `<table>
       <tr><th>调整日期</th><th>5年期利率</th><th>变动</th><th></th></tr>${rows}</table>`;
   }
+} catch(e) {
+  console.error('预计算渲染失败，回退JS计算:', e);
+  allData.m3_computed = null;
+  renderM3ComputeFull(null, null);
 }
 
 // ── 完整 JS 计算（兜底：日期不匹配时使用） ──
