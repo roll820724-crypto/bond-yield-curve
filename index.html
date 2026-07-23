@@ -1524,31 +1524,168 @@ function ffillDaily(dailyDates, sparseDates, sparseVals) {
 }
 
 async function renderMode3(data, row) {
-  // Show loading immediately on all cards
+  // ── Try pre-computed data first ──
+  if (!allData.m3_computed) {
+    try {
+      const resp = await fetch(`data_m3_computed.json?t=${Date.now()}`);
+      allData.m3_computed = await resp.json();
+    } catch(e) { console.warn('M3预计算数据加载失败，回退JS计算:', e); }
+  }
+  
+  const pc = allData.m3_computed;
+  // Use pre-computed if date matches; otherwise fall back to JS computation
+  if (pc && pc.computed_date === selectedDate) {
+    renderM3FromPrecomputed(pc);
+    return;
+  }
+  
+  // ── Fallback: full JS computation ──
+  renderM3ComputeFull(data, row);
+}
+
+// ── 从预计算数据渲染（秒开） ──
+function renderM3FromPrecomputed(pc) {
+  const dates = pc.dates;
+  const N_SEGMENTS = [
+    {hi:Infinity, lo:4.0, coef:0.20, base:null, threshold:4.0, label:'4%以上'},
+    {hi:4.0, lo:3.5, coef:0.30, base:null, threshold:3.5, label:'(3.5%,4%]'},
+    {hi:3.5, lo:3.0, coef:0.50, base:2.95, threshold:3.0, label:'(3%,3.5%]'},
+    {hi:3.0, lo:2.5, coef:0.95, base:2.475, threshold:2.5, label:'(2.5%,3%]'},
+    {hi:2.5, lo:2.0, coef:0.95, base:2.0, threshold:2.0, label:'(2%,2.5%]'},
+    {hi:2.0, lo:1.0, coef:1.00, base:1.0, threshold:1.0, label:'(1%,2%]'},
+    {hi:1.0, lo:0, coef:1.00, base:0, threshold:0, label:'1%以下'},
+  ];
+  
+  // Summary
+  const L = pc.latest;
+  document.getElementById('m3Summary').innerHTML = [
+    {label:'参考利率 M', val: L.M!=null ? (L.M*100).toFixed(2)+'%' : '—', col:'#2e75b6'},
+    {label:'预定利率 N', val: L.N!=null ? (L.N*100).toFixed(2)+'%' : '—', col:'#e74c3c'},
+    {label:'走廊中值(6MMA)', val: L.corridor_6mma!=null ? (L.corridor_6mma*100).toFixed(2)+'%' : '—', col:'#27ae60'},
+    {label:'基础回报水平', val: L.base_level!=null ? (L.base_level*100).toFixed(2)+'%' : '—', col:'#8e44ad'},
+  ].map(x => `<div class="summary-card"><div class="title">${x.label}</div><div class="value" style="color:${x.col}">${x.val}</div></div>`).join('');
+  
+  const n = dates.length;
+  const interval = Math.max(1, Math.floor(n / 6));
+  
+  // Chart 1: Corridor
+  (function(){
+    const dom = document.getElementById('m3ChartCorridor');
+    let c = echarts.getInstanceByDom(dom); if(c) c.dispose();
+    c = echarts.init(dom);
+    c.setOption({
+      tooltip:{trigger:'axis'}, legend:{data:['LPR 5Y','定存 5Y','走廊中值','走廊中值6MMA'], top:5},
+      grid:{left:55,right:20,top:40,bottom:40},
+      xAxis:{type:'category',data:dates.map(d=>d.slice(0,7)),axisLabel:{rotate:45,fontSize:9,interval}},
+      yAxis:{type:'value',name:'%',axisLabel:{formatter:v=>v.toFixed(1)}},
+      series:[
+        {name:'LPR 5Y',type:'line',data:pc.lpr5y,symbol:'none',lineStyle:{color:'#2e75b6',width:1.5}},
+        {name:'定存 5Y',type:'line',data:pc.deposit5y,symbol:'none',lineStyle:{color:'#e74c3c',width:1.5}},
+        {name:'走廊中值',type:'line',data:pc.corridor_mid,symbol:'none',lineStyle:{color:'#999',width:1,type:'dashed'}},
+        {name:'走廊中值6MMA',type:'line',data:pc.corridor_6mma,symbol:'none',lineStyle:{color:'#27ae60',width:2}},
+      ]
+    });
+  })();
+  
+  // Chart 2: Base return
+  (function(){
+    const dom = document.getElementById('m3ChartBaseReturn');
+    let c = echarts.getInstanceByDom(dom); if(c) c.dispose();
+    c = echarts.init(dom);
+    c.setOption({
+      tooltip:{trigger:'axis'}, legend:{data:['CGB 10Y到期','税收溢价(bp,右轴)','基础回报'], top:5},
+      grid:{left:55,right:60,top:40,bottom:40},
+      xAxis:{type:'category',data:dates.map(d=>d.slice(0,7)),axisLabel:{rotate:45,fontSize:9,interval}},
+      yAxis:[{type:'value',name:'%',axisLabel:{formatter:v=>v.toFixed(1)}},{type:'value',name:'bp'}],
+      series:[
+        {name:'CGB 10Y到期',type:'line',data:pc.cgb_10y,symbol:'none',lineStyle:{color:'#2e75b6',width:1.5}},
+        {name:'税收溢价(bp,右轴)',type:'line',yAxisIndex:1,data:pc.tax_premium,symbol:'none',lineStyle:{color:'#e74c3c',width:1},areaStyle:{color:'rgba(231,76,60,0.06)'}},
+        {name:'基础回报',type:'line',data:pc.base_return,symbol:'none',lineStyle:{color:'#8e44ad',width:2}},
+      ]
+    });
+  })();
+  
+  // Chart 3: MA levels
+  (function(){
+    const dom = document.getElementById('m3ChartMALevel');
+    let c = echarts.getInstanceByDom(dom); if(c) c.dispose();
+    c = echarts.init(dom);
+    c.setOption({
+      tooltip:{trigger:'axis'}, legend:{data:['基础回报','250MA','750MA','基础回报水平(MIN)'], top:5},
+      grid:{left:55,right:20,top:40,bottom:40},
+      xAxis:{type:'category',data:dates.map(d=>d.slice(0,7)),axisLabel:{rotate:45,fontSize:9,interval}},
+      yAxis:{type:'value',name:'%',axisLabel:{formatter:v=>v.toFixed(1)}},
+      series:[
+        {name:'基础回报',type:'line',data:pc.base_return,symbol:'none',lineStyle:{color:'#ccc',width:0.5}},
+        {name:'250MA',type:'line',data:pc.br_250ma,symbol:'none',lineStyle:{color:'#e74c3c',width:1.5}},
+        {name:'750MA',type:'line',data:pc.br_750ma,symbol:'none',lineStyle:{color:'#2e75b6',width:1.5}},
+        {name:'基础回报水平(MIN)',type:'line',data:pc.base_level,symbol:'none',lineStyle:{color:'#8e44ad',width:2.5}},
+      ]
+    });
+  })();
+  
+  // Chart 4: M vs N
+  (function(){
+    const dom = document.getElementById('m3ChartMN');
+    let c = echarts.getInstanceByDom(dom); if(c) c.dispose();
+    c = echarts.init(dom);
+    const marks = N_SEGMENTS.filter(s=>s.threshold>0.5).map(s=>({yAxis:s.threshold,lineStyle:{color:'#999',type:'dashed',width:0.5},label:{formatter:s.label,fontSize:9}}));
+    c.setOption({
+      tooltip:{trigger:'axis'}, legend:{data:['参考利率 M','预定利率 N'], top:5},
+      grid:{left:55,right:20,top:40,bottom:40},
+      xAxis:{type:'category',data:dates.map(d=>d.slice(0,7)),axisLabel:{rotate:45,fontSize:9,interval}},
+      yAxis:{type:'value',name:'%',axisLabel:{formatter:v=>v.toFixed(1)},max:v=>Math.max(4.5,(v.max||0)*1.05)},
+      series:[
+        {name:'参考利率 M',type:'line',data:pc.M,symbol:'none',lineStyle:{color:'#2e75b6',width:2},markLine:{silent:true,symbol:'none',data:marks}},
+        {name:'预定利率 N',type:'line',data:pc.N,symbol:'none',lineStyle:{color:'#e74c3c',width:2.5},areaStyle:{color:'rgba(231,76,60,0.08)'}},
+      ]
+    });
+  })();
+  
+  // Segment table
+  document.getElementById('m3TableCoeff').innerHTML = `<table>
+    <tr><th>参考利率区间</th><th>调节系数</th><th>分段基准</th><th>阈值</th><th>含义</th></tr>
+    ${N_SEGMENTS.map(s => `<tr>
+      <td>${s.label}</td><td>${(s.coef*100).toFixed(0)}%</td>
+      <td>${s.base!=null?(s.base*100).toFixed(2)+'%':'—'}</td>
+      <td>${(s.threshold*100).toFixed(1)}%</td>
+      <td>${s.coef<0.5?'高位：大幅缓冲':s.coef<1?'中位：部分跟':'低位：完全暴露'}</td>
+    </tr>`).join('')}
+  </table>`;
+  
+  // Deposit history (from global allData)
+  const deposit = allData.deposit5y;
+  if (deposit && deposit.dates && deposit.dates.length > 0) {
+    let rows = '';
+    for (let i = deposit.dates.length - 1; i >= 0; i--) {
+      const prev = i > 0 ? deposit.values[i - 1] : null;
+      const change = prev != null ? (deposit.values[i] - prev).toFixed(2) : '—';
+      rows += `<tr><td>${deposit.dates[i]}</td><td><b>${deposit.values[i].toFixed(2)}%</b></td>
+        <td class="${change>0?'up':'down'}">${change!=='—'?(change>0?'+':'')+change+'pp':'—'}</td>
+        <td style="font-size:11px;color:#888">${i===deposit.dates.length-1?'← 当前':''}</td></tr>`;
+    }
+    document.getElementById('m3TableDeposit').innerHTML = `<table>
+      <tr><th>调整日期</th><th>5年期利率</th><th>变动</th><th></th></tr>${rows}</table>`;
+  }
+}
+
+// ── 完整 JS 计算（兜底：日期不匹配时使用） ──
+async function renderM3ComputeFull(data, row) {
+  // Show loading
   ['m3ChartCorridor','m3ChartBaseReturn','m3ChartMALevel','m3ChartMN'].forEach(id => {
     const d = document.getElementById(id);
     if (!d) return;
     const c = echarts.getInstanceByDom(d);
     if (c) c.dispose();
     const nc = echarts.init(d);
-    nc.setOption({title:{text:'加载数据...',left:'center',top:'center',textStyle:{color:'#999',fontSize:16}}});
+    nc.setOption({title:{text:'正在计算...',left:'center',top:'center',textStyle:{color:'#999',fontSize:16}}});
   });
-  document.getElementById('m3Summary').innerHTML = 
-    '<div class="summary-card"><div class="title">参考利率 M</div><div class="value" style="color:#999">加载中...</div></div>' +
-    '<div class="summary-card"><div class="title">预定利率 N</div><div class="value" style="color:#999">加载中...</div></div>' +
-    '<div class="summary-card"><div class="title">走廊中值(6MMA)</div><div class="value" style="color:#999">加载中...</div></div>' +
-    '<div class="summary-card"><div class="title">基础回报水平</div><div class="value" style="color:#999">加载中...</div></div>';
   
-  // Load necessary data in parallel
   await Promise.all([ensureData('gov_ytm'), ensureData('cdb_ytm')]);
   const gYtm = allData.gov_ytm, cYtm = allData.cdb_ytm;
   const lpr = allData.lpr5y, deposit = allData.deposit5y;
-  if (!gYtm || !cYtm || !lpr || !deposit) {
-    document.getElementById('m3Summary').innerHTML = '<div class="summary-card"><div class="title">数据加载中...</div></div>';
-    return;
-  }
-
-  // ──── Step 1: Compute tax premium & base return ────
+  if (!gYtm || !cYtm || !lpr || !deposit) return;
+  
   const g9 = gYtm.terms.indexOf('9Y'), c9 = cYtm.terms.indexOf('9Y');
   const g10 = gYtm.terms.indexOf('10Y');
   if (g9<0 || c9<0 || g10<0) return;
