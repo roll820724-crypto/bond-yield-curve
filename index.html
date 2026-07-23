@@ -171,7 +171,7 @@ td.warn{background:#fff3cd}
     <span style="font-size:13px;color:#666;font-weight:600">曲线：</span>
     <label style="font-size:12px;cursor:pointer"><input type="checkbox" id="m2ckGovSpot" checked onchange="renderMode2Charts()"> 国债即期</label>
     <label style="font-size:12px;cursor:pointer"><input type="checkbox" id="m2ckGovYtm" onchange="renderMode2Charts()"> 国债到期</label>
-    <label style="font-size:12px;cursor:pointer"><input type="checkbox" id="m2ckCdbSpot" onchange="renderMode2Charts()"> 国开即期</label>
+    <label style="font-size:12px;cursor:pointer"><input type="checkbox" id="m2ckCdbSpot" checked onchange="renderMode2Charts()"> 国开即期</label>
     <label style="font-size:12px;cursor:pointer"><input type="checkbox" id="m2ckCdbYtm" onchange="renderMode2Charts()"> 国开到期</label>
     <label style="font-size:12px;cursor:pointer"><input type="checkbox" id="m2ckAdbc" onchange="renderMode2Charts()"> 农发债</label>
     <label style="font-size:12px;cursor:pointer"><input type="checkbox" id="m2ckExim" onchange="renderMode2Charts()"> 进出口行债</label>
@@ -417,7 +417,13 @@ function switchMode(mode) {
   document.querySelector(`[data-mode="${mode}"]`).classList.add('active');
   document.querySelectorAll('.mode-content').forEach(c => c.classList.remove('active'));
   document.getElementById(mode).classList.add('active');
+  if (mode === 'mode2') preloadMode2();
   renderAll();
+}
+
+// ── 预加载模式二常用数据 ──
+function preloadMode2() {
+  ['cdb_spot'].forEach(k => { if (!allData[k]) ensureData(k); });
 }
 
 // ── 工具函数 ──
