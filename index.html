@@ -1689,8 +1689,8 @@ function renderM3FromPrecomputed(pc) {
     <tr><th>参考利率区间</th><th>调节系数</th><th>分段基准</th><th>阈值</th><th>含义</th></tr>
     ${N_SEGMENTS.map(s => `<tr>
       <td>${s.label}</td><td>${(s.coef*100).toFixed(0)}%</td>
-      <td>${s.base!=null?(s.base*100).toFixed(2)+'%':'—'}</td>
-      <td>${(s.threshold*100).toFixed(1)}%</td>
+      <td>${s.base!=null?s.base.toFixed(2)+'%':'—'}</td>
+      <td>${s.threshold.toFixed(1)}%</td>
       <td>${s.coef<0.5?'高位：大幅缓冲':s.coef<1?'中位：部分跟':'低位：完全暴露'}</td>
     </tr>`).join('')}
   </table>`;
@@ -1912,8 +1912,8 @@ async function renderM3ComputeFull(data, row) {
     <tr><th>参考利率区间</th><th>调节系数</th><th>分段基准</th><th>阈值</th><th>含义</th></tr>
     ${M3_SEGMENTS.map(s => `<tr>
       <td>${s.label}</td><td>${(s.coef*100).toFixed(0)}%</td>
-      <td>${s.base!=null?(s.base*100).toFixed(2)+'%':'—'}</td>
-      <td>${(s.threshold*100).toFixed(1)}%</td>
+      <td>${s.base!=null?s.base.toFixed(2)+'%':'—'}</td>
+      <td>${s.threshold.toFixed(1)}%</td>
       <td>${s.coef<0.5?'高位：大幅缓冲':s.coef<1?'中位：部分跟':'低位：完全暴露'}</td>
     </tr>`).join('')}
   </table>`;
