@@ -1588,6 +1588,13 @@ async function renderMode3(data, row) {
   // ──── Step 5: N = piecewise adjustment of M
   const Nvals = Mvals.map(m => m!=null ? +adjN(m).toFixed(6) : null);
   
+  // ──── Chart display: start from 2025-01 (when mechanism was implemented; MA looks back 750 days) ────
+  let displayStart = dates.findIndex(d => d >= '2025-01-01');
+  if (displayStart < 0) {
+    displayStart = dates.findIndex(d => d >= '2019-01-01');
+    if (displayStart < 0) displayStart = 0;
+  }
+  
   // ──── Summary cards ────
   let lastM = null, lastN = null, lastCorr = null, lastBL = null;
   for (let i = n-1; i >= 0; i--) {
@@ -1616,13 +1623,13 @@ async function renderMode3(data, row) {
     chart.setOption({
       tooltip:{trigger:'axis'}, legend:{data:['LPR 5Y','定存 5Y','走廊中值','走廊中值6MMA'], top:5},
       grid:{left:55,right:20,top:40,bottom:40},
-      xAxis:{type:'category',data:dates.slice(start).map(d=>d.slice(0,7)),axisLabel:{rotate:45,fontSize:9,interval:Math.floor((n-start)/12)}},
+      xAxis:{type:'category',data:dates.slice(displayStart).map(d=>d.slice(0,7)),axisLabel:{rotate:45,fontSize:9,interval:Math.floor((n-displayStart)/6)}},
       yAxis:{type:'value',name:'%',axisLabel:{formatter:v=>v.toFixed(1)}},
       series:[
-        {name:'LPR 5Y',type:'line',data:lprFF.slice(start).map(v=>v!=null?+v.toFixed(6):null),symbol:'none',lineStyle:{color:'#2e75b6',width:1.5}},
-        {name:'定存 5Y',type:'line',data:depFF.slice(start).map(v=>v!=null?+v.toFixed(6):null),symbol:'none',lineStyle:{color:'#e74c3c',width:1.5}},
-        {name:'走廊中值',type:'line',data:corridorMid.slice(start).map(v=>v!=null?+v.toFixed(6):null),symbol:'none',lineStyle:{color:'#999',width:1,type:'dashed'}},
-        {name:'走廊中值6MMA',type:'line',data:corridor6MMA.slice(start).map(v=>v!=null?+v.toFixed(6):null),symbol:'none',lineStyle:{color:'#27ae60',width:2}},
+        {name:'LPR 5Y',type:'line',data:lprFF.slice(displayStart).map(v=>v!=null?+v.toFixed(6):null),symbol:'none',lineStyle:{color:'#2e75b6',width:1.5}},
+        {name:'定存 5Y',type:'line',data:depFF.slice(displayStart).map(v=>v!=null?+v.toFixed(6):null),symbol:'none',lineStyle:{color:'#e74c3c',width:1.5}},
+        {name:'走廊中值',type:'line',data:corridorMid.slice(displayStart).map(v=>v!=null?+v.toFixed(6):null),symbol:'none',lineStyle:{color:'#999',width:1,type:'dashed'}},
+        {name:'走廊中值6MMA',type:'line',data:corridor6MMA.slice(displayStart).map(v=>v!=null?+v.toFixed(6):null),symbol:'none',lineStyle:{color:'#27ae60',width:2}},
       ]
     });
   })();
@@ -1635,15 +1642,15 @@ async function renderMode3(data, row) {
     chart.setOption({
       tooltip:{trigger:'axis'}, legend:{data:['CGB 10Y到期','税收溢价(bp,右轴)','基础回报'], top:5},
       grid:{left:55,right:60,top:40,bottom:40},
-      xAxis:{type:'category',data:dates.slice(start).map(d=>d.slice(0,7)),axisLabel:{rotate:45,fontSize:9,interval:Math.floor((n-start)/12)}},
+      xAxis:{type:'category',data:dates.slice(displayStart).map(d=>d.slice(0,7)),axisLabel:{rotate:45,fontSize:9,interval:Math.floor((n-displayStart)/6)}},
       yAxis:[
         {type:'value',name:'%',axisLabel:{formatter:v=>v.toFixed(1)}},
         {type:'value',name:'bp'}
       ],
       series:[
-        {name:'CGB 10Y到期',type:'line',data:cgb10y.slice(start),symbol:'none',lineStyle:{color:'#2e75b6',width:1.5}},
-        {name:'税收溢价(bp,右轴)',type:'line',yAxisIndex:1,data:tax.slice(start),symbol:'none',lineStyle:{color:'#e74c3c',width:1},areaStyle:{color:'rgba(231,76,60,0.06)'}},
-        {name:'基础回报',type:'line',data:baseReturn.slice(start),symbol:'none',lineStyle:{color:'#8e44ad',width:2}},
+        {name:'CGB 10Y到期',type:'line',data:cgb10y.slice(displayStart),symbol:'none',lineStyle:{color:'#2e75b6',width:1.5}},
+        {name:'税收溢价(bp,右轴)',type:'line',yAxisIndex:1,data:tax.slice(displayStart),symbol:'none',lineStyle:{color:'#e74c3c',width:1},areaStyle:{color:'rgba(231,76,60,0.06)'}},
+        {name:'基础回报',type:'line',data:baseReturn.slice(displayStart),symbol:'none',lineStyle:{color:'#8e44ad',width:2}},
       ]
     });
   })();
@@ -1656,13 +1663,13 @@ async function renderMode3(data, row) {
     chart.setOption({
       tooltip:{trigger:'axis'}, legend:{data:['基础回报','250MA','750MA','基础回报水平(MIN)'], top:5},
       grid:{left:55,right:20,top:40,bottom:40},
-      xAxis:{type:'category',data:dates.slice(start).map(d=>d.slice(0,7)),axisLabel:{rotate:45,fontSize:9,interval:Math.floor((n-start)/12)}},
+      xAxis:{type:'category',data:dates.slice(displayStart).map(d=>d.slice(0,7)),axisLabel:{rotate:45,fontSize:9,interval:Math.floor((n-displayStart)/6)}},
       yAxis:{type:'value',name:'%',axisLabel:{formatter:v=>v.toFixed(1)}},
       series:[
-        {name:'基础回报',type:'line',data:baseReturn.slice(start),symbol:'none',lineStyle:{color:'#ccc',width:0.5}},
-        {name:'250MA',type:'line',data:br250.slice(start),symbol:'none',lineStyle:{color:'#e74c3c',width:1.5}},
-        {name:'750MA',type:'line',data:br750.slice(start),symbol:'none',lineStyle:{color:'#2e75b6',width:1.5}},
-        {name:'基础回报水平(MIN)',type:'line',data:baseLevel.slice(start),symbol:'none',lineStyle:{color:'#8e44ad',width:2.5}},
+        {name:'基础回报',type:'line',data:baseReturn.slice(displayStart),symbol:'none',lineStyle:{color:'#ccc',width:0.5}},
+        {name:'250MA',type:'line',data:br250.slice(displayStart),symbol:'none',lineStyle:{color:'#e74c3c',width:1.5}},
+        {name:'750MA',type:'line',data:br750.slice(displayStart),symbol:'none',lineStyle:{color:'#2e75b6',width:1.5}},
+        {name:'基础回报水平(MIN)',type:'line',data:baseLevel.slice(displayStart),symbol:'none',lineStyle:{color:'#8e44ad',width:2.5}},
       ]
     });
   })();
@@ -1676,14 +1683,14 @@ async function renderMode3(data, row) {
     chart.setOption({
       tooltip:{trigger:'axis'}, legend:{data:['参考利率 M','预定利率 N'], top:5},
       grid:{left:55,right:20,top:40,bottom:40},
-      xAxis:{type:'category',data:dates.slice(start).map(d=>d.slice(0,7)),axisLabel:{rotate:45,fontSize:9,interval:Math.floor((n-start)/12)}},
+      xAxis:{type:'category',data:dates.slice(displayStart).map(d=>d.slice(0,7)),axisLabel:{rotate:45,fontSize:9,interval:Math.floor((n-displayStart)/6)}},
       yAxis:{type:'value',name:'%',axisLabel:{formatter:v=>v.toFixed(1)},
         max: val => Math.max(4.5, (val.max||0)*1.05)
       },
       series:[
-        {name:'参考利率 M',type:'line',data:Mvals.slice(start),symbol:'none',lineStyle:{color:'#2e75b6',width:2},
+        {name:'参考利率 M',type:'line',data:Mvals.slice(displayStart),symbol:'none',lineStyle:{color:'#2e75b6',width:2},
           markLine:{silent:true,symbol:'none',data:markLines}},
-        {name:'预定利率 N',type:'line',data:Nvals.slice(start),symbol:'none',lineStyle:{color:'#e74c3c',width:2.5},
+        {name:'预定利率 N',type:'line',data:Nvals.slice(displayStart),symbol:'none',lineStyle:{color:'#e74c3c',width:2.5},
           areaStyle:{color:'rgba(231,76,60,0.08)'}},
       ]
     });
