@@ -1484,9 +1484,8 @@ function ffillDaily(dailyDates, sparseDates, sparseVals) {
 }
 
 async function renderMode3(data, row) {
-  // Load necessary data
-  await ensureData('gov_ytm');
-  await ensureData('cdb_ytm');
+  // Load necessary data in parallel
+  await Promise.all([ensureData('gov_ytm'), ensureData('cdb_ytm')]);
   const gYtm = allData.gov_ytm, cYtm = allData.cdb_ytm;
   const lpr = allData.lpr5y, deposit = allData.deposit5y;
   if (!gYtm || !cYtm || !lpr || !deposit) {
