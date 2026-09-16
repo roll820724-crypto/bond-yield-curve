@@ -93,6 +93,7 @@ td.warn{background:#fff3cd}
   <input type="date" id="datePicker">
   <button onclick="refresh()">刷新</button>
   <button onclick="downloadFullCurve()" style="background:#27ae60">📥 下载全量1-20Y</button>
+  <button onclick="toggleManual()" style="background:#8e44ad">📖 使用说明</button>
   <span style="font-size:12px;color:#999;margin-left:8px" id="dateInfo"></span>
 </div>
 
@@ -164,9 +165,18 @@ td.warn{background:#fff3cd}
     <!-- ═══ 卡片7：导出历史750曲线（v40 新增） ═══ -->
     <div class="chart-card">
       <h2>📤 导出历史750曲线 <button onclick="export750History()" style="float:right;font-size:10px;padding:1px 6px;background:#2e75b6;color:#fff;border:none;border-radius:3px;cursor:pointer">📥 一键导出</button></h2>
-      <div class="card-desc">导出完整 750MA 期限结构（1Y–50Y）底稿，导出对象＝工具栏当前所选曲线。<br>
+      <div class="card-desc">导出完整 750MA 期限结构（1Y–50Y）底稿，口径与页面 calc750MA 一致（750 个交易日滑动窗口、窗口内非空值算术平均）。<br>
       <b>按关键日期</b>：输入多个日期（换行、逗号、空格分隔均可，支持 2025-12-31 / 2025/12/31 / 20251231 三种写法），输出各日期对应的 750MA 期限结构；非交易日自动取该日前最近一个交易日并在底稿中标注。<br>
-      <b>按区间</b>：输入起始与结束日期，输出区间内每个交易日的 750MA 期限结构。口径与页面 calc750MA 一致（窗口 750 个交易日、窗口内非空值算术平均）。</div>
+      <b>按区间</b>：输入起始与结束日期，输出区间内每个交易日的 750MA 期限结构。<br>
+      底稿在 50 个期限列之后附衍生列：1-20Y均值、10Y-1Y、5Y-1Y、30Y-10Y（利差单位 bp）。勾选多条曲线时，每条曲线一个工作表。</div>
+      <div style="display:flex;gap:12px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
+        <span style="font-size:12px;color:#666">导出曲线（可多选）：</span>
+        <label style="font-size:12px"><input type="checkbox" class="e750Curve" value="gov_spot" checked onchange="e750CurveTouched=true"> 国债即期</label>
+        <label style="font-size:12px"><input type="checkbox" class="e750Curve" value="cdb_spot" onchange="e750CurveTouched=true"> 国开债即期</label>
+        <label style="font-size:12px"><input type="checkbox" class="e750Curve" value="gov_ytm" onchange="e750CurveTouched=true"> 国债到期</label>
+        <label style="font-size:12px"><input type="checkbox" class="e750Curve" value="cdb_ytm" onchange="e750CurveTouched=true"> 国开债到期</label>
+        <span style="font-size:11px;color:#aaa" id="e750CurveHint">（默认跟随工具栏所选曲线）</span>
+      </div>
       <div style="display:flex;gap:14px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
         <label style="font-size:12px"><input type="radio" name="e750Mode" value="dates" checked onchange="onE750ModeChange()"> 按关键日期</label>
         <label style="font-size:12px"><input type="radio" name="e750Mode" value="range" onchange="onE750ModeChange()"> 按区间</label>
@@ -335,6 +345,120 @@ td.warn{background:#fff3cd}
 </div>
 
 <div class="footer">数据来源：中国债券信息网 (yield.chinabond.com.cn) ｜ 自动更新于每日17:30</div>
+
+<!-- ═══════════ 使用说明（浮动面板，v40.1 新增） ═══════════ -->
+<style>
+#manualPanel h3 { font-size:14px; color:#1f4e79; margin:18px 0 6px; padding-bottom:4px; border-bottom:1px solid #e6e6e6; }
+#manualPanel h6 { font-size:13px; color:#333; margin:12px 0 4px; }
+#manualPanel p, #manualPanel li { font-size:12.5px; line-height:1.9; color:#444; margin:5px 0; }
+#manualPanel ul { margin:4px 0 4px 18px; padding:0; }
+#manualPanel code { background:#f4f6f8; padding:1px 4px; border-radius:3px; font-size:12px; color:#c0392b; }
+#manualPanel table { border-collapse:collapse; margin:6px 0; width:100%; }
+#manualPanel th, #manualPanel td { border:1px solid #e0e0e0; padding:5px 8px; font-size:12px; text-align:left; vertical-align:top; }
+#manualPanel th { background:#f7f9fb; color:#1f4e79; font-weight:600; }
+</style>
+<div id="manualPanel" style="display:none;position:fixed;inset:0;background:rgba(20,25,35,.55);z-index:9999" onclick="if(event.target===this)toggleManual()">
+  <div style="position:absolute;top:3vh;left:50%;transform:translateX(-50%);width:min(960px,94vw);max-height:94vh;overflow:auto;background:#fff;border-radius:10px;padding:24px 34px 40px;box-shadow:0 14px 44px rgba(0,0,0,.35)">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px solid #1f4e79;padding-bottom:8px">
+      <h1 style="font-size:18px;color:#1f4e79;margin:0">精算利率监测平台 · 使用说明</h1>
+      <button onclick="toggleManual()" style="background:#1f4e79;color:#fff;border:none;border-radius:4px;padding:4px 12px;cursor:pointer;font-size:12px">关闭</button>
+    </div>
+    <div style="font-size:11.5px;color:#888;margin-top:8px">页面版本 v40.1（2026-09-16）｜ 在线地址：https://roll820724-crypto.github.io/bond-yield-curve/ ｜ 本地目录：~/hermes/工作/利率曲线/</div>
+
+    <h3>一、这个页面是干什么的</h3>
+    <p>用中国债券信息网（中债网）官方收益率曲线数据，监测与精算定价、评估相关的利率指标。三种模式：</p>
+    <table>
+      <tr><th style="width:150px">模式</th><th>看什么</th></tr>
+      <tr><td>① 750相关分析</td><td>评估口径：以 750 日移动平均（750MA）为基准，看当日曲线与评估用曲线的差距、750 口径的期限利差、10Y 历史中枢与置信带、评估时点对比、曲线外推，以及历史 750MA 曲线底稿导出。</td></tr>
+      <tr><td>② 当日线相关分析</td><td>市场口径：国债/国开债即期与到期曲线对比、税收溢价（国开-国债 9Y 即期）、期限结构对比、10Y 走势、AAA 企业债较国开债溢价。</td></tr>
+      <tr><td>③ 预定利率动态追踪</td><td>按监管分段调节机制：利率走廊、基础回报水平、参考利率 M、预定利率 N、分段调节系数表及调整前后对比，附 LPR/定存验证数据。</td></tr>
+    </table>
+
+    <h3>二、数据来源、更新机制</h3>
+    <ul>
+      <li><b>来源</b>：中债网官方接口（<code>yield.chinabond.com.cn</code>），抓取 1Y–50Y 全期限结构；国债、国开债各取「即期」与「到期」两个口径，共 4 条核心曲线。</li>
+      <li><b>自动更新</b>（家里 Mac mini 上的定时任务）：每日 <b>17:30</b> 抓取当日数据 → <b>18:00</b> 预计算模式三 → <b>18:10</b> 提交并推送到 GitHub Pages。周末、节假日无新数据时不产生新版本。</li>
+      <li><b>数据版本</b>：<code>version.json</code> 记录版本号（形如 20260915181032，即 2026-09-15 18:10:32）与数据日期。页面所有资源都带上该版本号加载，用于穿透浏览器缓存——所以数据更新后正常刷新即可看到最新数据，不必手动清缓存。</li>
+      <li><b>怎么看数据新旧</b>：页面顶部「数据更新至 XXXX-XX-XX」就是当前展示的数据日期。</li>
+    </ul>
+
+    <h3>三、750MA 的计算口径（最重要，务必记住）</h3>
+    <ul>
+      <li><b>窗口</b>：对第 i 个交易日，取 <code>[i-749, i]</code> 共 <b>750 个交易日</b>（不是自然日、不是取 750 天前的单点），对该期限内该期限点的所有非空值取算术平均。</li>
+      <li><b>样本不足</b>：窗口内非空值不足 750 个时，按实际非空样本平均；窗口内交易日数少于 20 个时不出值（留空）。</li>
+      <li><b>暖机期</b>：数据自 2008-01-02 起，前约 750 个交易日（至 2011 年 1 月）样本不满，那一段的 750MA 不建议使用。</li>
+      <li><b>校验锚点</b>：2025-12-31 国债即期 1–20Y 各整数年期限 750MA 的均值 = <b>2.2315%</b>（与手工底稿 2.232% 一致，差 0.05bp）。这个数可以用来验证任何一次口径调整是否做对了。</li>
+    </ul>
+
+    <h3>四、模式一各卡片</h3>
+    <table>
+      <tr><th style="width:230px">卡片</th><th>内容</th></tr>
+      <tr><td>📉 收益率曲线（即期 vs 750MA）</td><td>基准日的当日曲线与当日 750MA 对比，并给出汇总数字。</td></tr>
+      <tr><td>📊 期限利差走势（750）</td><td>750 口径的三条利差历史走势：10Y-1Y（期限溢价）、30Y-10Y（超长端定价）、5Y-1Y（中短端陡峭程度）；可切换过去 1 年 / 3 年 / 全部。</td></tr>
+      <tr><td>📋 关键期限 vs 750MA 偏离</td><td>1Y/3Y/5Y/7Y/10Y/15Y/20Y/30Y/50Y 的当日值、750MA 值及偏离（bp）。</td></tr>
+      <tr><td>📅 10Y 实际 vs 750MA ±1.96σ</td><td>10Y 的 750MA 中枢与 750 日窗口标准差构成的置信带（自 2013 年起，更早样本不足），三色分区看偏离位置。</td></tr>
+      <tr><td>🔄 不同评估时点 750 对比</td><td>选两个时点，比较各自 750MA 的期限结构；「变动」= A − B。请注意两个时点的含义（时点 A = 当前选择时点，时点 B = 参考时点）。</td></tr>
+      <tr><td>📈 曲线外推：750MA 预测</td><td>对未来 12 个季末的 750MA 做外推，三种口径：<b>基于日期</b>（未来每日曲线恒等于所选日曲线，向前滚动算出 750MA）；<b>基于中枢</b>（输入目标 10Y 中枢值，取历史上 10Y 最接近该值的日期）；<b>基于利差</b>（以基准日曲线形状为底，整体平移到目标 10Y 水平）。</td></tr>
+      <tr><td>📤 导出历史750曲线</td><td>历史 750MA 曲线底稿导出，见第六节。</td></tr>
+    </table>
+
+    <h3>五、导出功能一览</h3>
+    <table>
+      <tr><th style="width:230px">入口</th><th>导出内容</th></tr>
+      <tr><td>工具栏 📥 下载全量1-20Y</td><td>工具栏当前曲线的<b>原始数据</b>（全部历史、1–20Y，非 750MA）。</td></tr>
+      <tr><td>各卡片右上角 📥底稿</td><td>该卡片当前展示内容的数值底稿（单时点、或图上区间的数值）。</td></tr>
+      <tr><td>卡片7 📥 一键导出</td><td><b>历史 750MA 曲线</b>底稿：可按关键日期，也可按区间；可同时导出多条曲线，见下节。</td></tr>
+    </table>
+
+    <h3>六、导出历史750曲线（卡片7，2026-09-16 新增）</h3>
+    <h6>6.1 两种导出方式</h6>
+    <ul>
+      <li><b>按关键日期</b>：输入框里填多个日期，换行、逗号、分号、空格分隔都认；日期写法 <code>2025-12-31</code>、<code>2025/12/31</code>、<code>2025.12.31</code>、<code>20251231</code>、<code>2025年12月31日</code> 均可。输出每个日期对应的 750MA 期限结构。<b>非交易日会自动取该日前最近一个交易日</b>，底稿中同时保留「请求日期」和「实际交易日」两列，不会张冠李戴。识别不了的词条会跳过并在卡片下方提示「已跳过」。</li>
+      <li><b>按区间</b>：选起始与结束日期，输出区间内<b>每个交易日</b>的 750MA 期限结构（非交易日没有 750 数据，因此只输出真实交易日）。区间内交易日数超过 1500 时会先弹确认框，告知数据量。</li>
+    </ul>
+    <h6>6.2 曲线勾选</h6>
+    <p>可多选（国债即期 / 国开债即期 / 国债到期 / 国开债到期），<b>默认跟随工具栏所选曲线</b>；手动改动后就不再跟随。勾选多条时，每条曲线一个工作表（工作表名即曲线名），另加一张「计算说明」表。</p>
+    <h6>6.3 底稿列结构</h6>
+    <p>关键日期方式：<code>请求日期 | 实际交易日 | 1Y | 2Y | … | 50Y | 1-20Y均值 | 10Y-1Y(bp) | 5Y-1Y(bp) | 30Y-10Y(bp)</code>；区间方式去掉「请求日期」列。衍生列口径：1-20Y均值 = 该行 1Y~20Y 各整数年期限 750MA 的算术平均（保留 6 位小数）；三个利差 = 由该行收益率列相减、四舍五入保留 2 位小数，单位 bp。衍生列可以直接用同一行的收益率列复算，结果一致。</p>
+    <h6>6.4 文件名与规模</h6>
+    <ul>
+      <li>单曲线：<code>750MA曲线_关键日期_国债即期.xlsx</code> 或 <code>750MA曲线_2026-09-01至2026-09-15_国债即期.xlsx</code>；多曲线时曲线名替换为「N条曲线」。</li>
+      <li>实测：国债即期全区间（2008-01-02 至 2026-09-15，4766 个交易日 × 50 个期限）导出 7.29MB、耗时约 0.3 秒；4 条曲线同时导出约 30MB 量级，桌面端无压力，手机端较慢。</li>
+    </ul>
+    <h6>6.5 口径一致性</h6>
+    <p>导出值与页面图表同源同算法：程序内部用滑动窗口累加计算（加当日、减第 750 日前的一天），与页面 calc750MA 在最新交易日 50 个期限上逐项比对差异为 0；与独立 Python 复算逐格比对差异在 5e-7 以内（6 位小数舍入）。</p>
+
+    <h3>七、常见问题</h3>
+    <ul>
+      <li><b>手机或公司网络打开后文字、数字正常，但图表全白</b>：页面图表依赖外部 CDN（ECharts、SheetJS）。网络取不到 CDN 时会出现这种情况。换网络重试；若长期需要在受限网络用，可改为本地内嵌版本（需改 index.html 两个 script 引用）。</li>
+      <li><b>打开后数据没更新</b>：先看顶部数据日期；若仍是旧的，在地址后加 <code>?v=1</code> 强制刷新。若当天是节假日，本就没有新数据。</li>
+      <li><b>模式三的日期比模式一少一天</b>：模式三预计算排在 18:00，主数据 18:10 入库，因此模式三通常滞后一个交易日，页面会自动走前端兜底计算。</li>
+      <li><b>模式二里 4 条扩展曲线（企业债AAA、农发债、进出口行债、保险资本补充债）数据停在 2026-07-22</b>：抓数脚本目前只覆盖 4 条核心曲线，扩展曲线未纳入每日更新，属于已知未完成项。</li>
+    </ul>
+
+    <h3>八、维护备忘（写给以后的自己）</h3>
+    <table>
+      <tr><th style="width:200px">文件 / 事项</th><th>作用</th></tr>
+      <tr><td>index.html</td><td>整个页面：样式、三种模式、全部图表与导出逻辑都在里面（纯前端，ECharts + SheetJS）。</td></tr>
+      <tr><td>update.py</td><td>抓取中债网数据，写入 4 条核心曲线的 json 与 summary.json、version.json。文件头注明「引用自 yyseles/bond-yield-curve」。</td></tr>
+      <tr><td>compute_m3.py</td><td>模式三预计算，读国债/国开到期、LPR5Y、5年定存，输出 data_m3_computed.json（前端秒开用）。</td></tr>
+      <tr><td>data.json / data_gov_ytm.json / data_cdb.json / data_cdb_ytm.json</td><td>国债即期 / 国债到期 / 国开债即期 / 国开债到期，结构为 {dates:[], terms:[], rows:[[]]}。</td></tr>
+      <tr><td>data_corp_aaa / data_adbc / data_exim / data_insurer.json</td><td>模式二的 4 条扩展曲线（当前停更，见第七节）。</td></tr>
+      <tr><td>data_lpr5y.json / data_deposit5y.json / data_m3_computed.json</td><td>模式三输入与预计算结果。</td></tr>
+      <tr><td>手工更新一次</td><td><code>cd ~/hermes/工作/利率曲线 &amp;&amp; python3 update.py</code>，然后按需 <code>python3 compute_m3.py</code>，再 <code>git add -A &amp;&amp; git commit &amp;&amp; git push</code>。</td></tr>
+      <tr><td>定时任务</td><td>17:30 抓数、18:00 模式三预计算、18:10 提交推送（家里 Mac mini 上的 cron）。</td></tr>
+      <tr><td>仓库与线上地址</td><td>GitHub 仓库 roll820724-crypto/bond-yield-curve，Pages 地址见文首；推送后 1–5 分钟生效。</td></tr>
+    </table>
+
+    <h3>九、变更记录</h3>
+    <table>
+      <tr><th style="width:110px">日期</th><th>变更</th></tr>
+      <tr><td>2026-09-16</td><td>新增卡片7「导出历史750曲线」：按关键日期 / 按区间两种导出方式，支持多曲线勾选，底稿增加 1-20Y均值与三个关键期限利差列；新增本使用说明面板。</td></tr>
+      <tr><td>2026-07-16</td><td>三模式框架成型（750 / 当日线 / 预定利率），750MA 窗口统一为 750 个交易日，新增置信带、评估时点对比、曲线外推。</td></tr>
+      <tr><td>2026-07-14</td><td>仪表盘首次上线：四条核心曲线、750MA、期限利差、关键期限表，cron 每日 17:30 自动更新。</td></tr>
+    </table>
+  </div>
+</div>
 
 <!-- ═══════════ JavaScript ═══════════ -->
 <script>
@@ -528,80 +652,160 @@ function syncE750DateBounds(data) {
   s.min = first; s.max = latest; e.min = first; e.max = latest;
   if (!s.value || s.value < first || s.value > latest) s.value = data.dates[Math.max(0, data.dates.length - 251)];
   if (!e.value || e.value < first || e.value > latest) e.value = latest;
+  // 曲线勾选未手动改过时，跟随工具栏所选曲线（v40.1）
+  if (!e750CurveTouched) {
+    const boxes = [...document.querySelectorAll('.e750Curve')];
+    if (boxes.some(cb => cb.value === currentCurve)) boxes.forEach(cb => { cb.checked = (cb.value === currentCurve); });
+  }
 }
 
-function export750History() {
-  const data = getData(currentCurve);
+// 衍生列（v40.1 新增）：1-20Y均值 + 三个关键期限利差
+const E750_DERIVED = ['1-20Y均值', '10Y-1Y(bp)', '5Y-1Y(bp)', '30Y-10Y(bp)'];
+let e750CurveTouched = false;
+
+function e750Derived(vals, terms) {
+  // 以 1e-6% 为单位做整数运算，避免二进制浮点在半分位上舍入方向漂移
+  const half = v => (v < 0 ? -1 : 1) * Math.round(Math.abs(v));
+  const micro = vals.map(v => (v == null || isNaN(v)) ? null : Math.round(v * 1e6));
+  const i20 = terms.map((t, i) => ({ n: parseInt(t, 10), i }))
+                   .filter(o => o.n >= 1 && o.n <= 20 && micro[o.i] != null).map(o => o.i);
+  let avg20 = null;
+  if (i20.length) avg20 = half(i20.reduce((a, i) => a + micro[i], 0) / i20.length) / 1e6;
+  const spread = (a, b) => {
+    const i = terms.indexOf(a), j = terms.indexOf(b);
+    if (i < 0 || j < 0 || micro[i] == null || micro[j] == null) return null;
+    return half((micro[i] - micro[j]) / 100) / 100;   // → bp，保留 2 位
+  };
+  return [avg20, spread('10Y', '1Y'), spread('5Y', '1Y'), spread('30Y', '10Y')];
+}
+
+async function export750History() {
   const info = document.getElementById('e750Info');
-  if (!data.dates.length) { alert('数据尚未加载完成，请稍候再试。'); return; }
-  const el = document.querySelector('input[name="e750Mode"]:checked');
-  const mode = el ? el.value : 'dates';
-  const terms = data.terms;
-  const curveName = CURVE_NAMES[currentCurve] || currentCurve;
+  const btn = document.querySelector('button[onclick="export750History()"]');
+  const release = () => { if (btn) btn.disabled = false; };
+  const mode = (document.querySelector('input[name="e750Mode"]:checked') || { value: 'dates' }).value;
+  const keys = [...document.querySelectorAll('.e750Curve:checked')].map(c => c.value);
+  if (!keys.length) { alert('请至少勾选一条导出曲线。'); return; }
 
-  const targets = [];   // {ask: 请求日期, date: 实际交易日, idx}
-  let rangeLabel = '';
+  // ① 取数（未加载的曲线按需拉取）
+  if (btn) btn.disabled = true;
+  info.textContent = '⏳ 正在加载数据…';
+  const curves = [], failedLoad = [];
+  for (const k of keys) {
+    await ensureData(k);
+    const d = getData(k);
+    if (!d.dates.length) { failedLoad.push(CURVE_NAMES[k] || k); continue; }
+    curves.push({ key: k, name: CURVE_NAMES[k] || k, data: d });
+  }
+  if (!curves.length) { info.textContent = `⚠️ 所选曲线（${failedLoad.join('、')}）数据加载失败，请刷新页面重试。`; release(); return; }
+  const terms = curves[0].data.terms;
+  const ref = getData(keys.includes(currentCurve) ? currentCurve : keys[0]);
+
+  // ② 解析导出目标
+  let reqDates = [], start = '', end = '', rangeLabel = '';
   const bad = [];
-
   if (mode === 'dates') {
-    const { dates, bad: badRaw } = parseDateList(document.getElementById('e750Dates').value);
-    bad.push(...badRaw);
-    if (!dates.length) { alert('请先输入至少一个日期。'); return; }
-    dates.forEach(d => {
-      const idx = resolveTradingIdx(data.dates, d);
-      if (idx < 0) bad.push(d + '(早于数据起点)');
-      else targets.push({ ask: d, date: data.dates[idx], idx });
-    });
-    if (!targets.length) { alert(`输入的日期都早于数据起点 ${data.dates[0]}，无法取值。`); return; }
+    const p = parseDateList(document.getElementById('e750Dates').value);
+    reqDates = p.dates; bad.push(...p.bad);
+    if (!reqDates.length) { alert('请先输入至少一个日期。'); release(); return; }
   } else {
-    const s = document.getElementById('e750Start').value, e = document.getElementById('e750End').value;
-    if (!s || !e) { alert('请先选择起始和结束日期。'); return; }
-    if (s > e) { alert('起始日期不能晚于结束日期，请调整。'); return; }
-    const i0 = resolveTradingIdx(data.dates, s), i1 = resolveTradingIdx(data.dates, e);
-    if (i0 < 0) { alert(`起始日期早于数据起点 ${data.dates[0]}。`); return; }
-    if (i1 < i0) { alert('该区间内没有交易日数据。'); return; }
-    for (let i = i0; i <= i1; i++) targets.push({ ask: '', date: data.dates[i], idx: i });
-    rangeLabel = `${data.dates[i0]}至${data.dates[i1]}`;
+    start = document.getElementById('e750Start').value;
+    end = document.getElementById('e750End').value;
+    if (!start || !end) { alert('请先选择起始和结束日期。'); release(); return; }
+    if (start > end) { alert('起始日期不能晚于结束日期，请调整。'); release(); return; }
+    const i0 = resolveTradingIdx(ref.dates, start), i1 = resolveTradingIdx(ref.dates, end);
+    if (i0 < 0) { alert(`起始日期早于数据起点 ${ref.dates[0]}。`); release(); return; }
+    if (i1 < i0) { alert('该区间内没有交易日数据。'); release(); return; }
+    rangeLabel = `${ref.dates[i0]}至${ref.dates[i1]}`;
+    const nRef = i1 - i0 + 1;
+    const dots = nRef * curves.length * (terms.length + E750_DERIVED.length);
+    if (nRef > 1500 && !confirm(`本次将导出 ${nRef} 个交易日 × ${curves.length} 条曲线 × ${terms.length} 个期限，约 ${(dots / 10000).toFixed(0)} 万个数据点，文件较大、生成需要十几秒，手机端可能较慢。是否继续？`)) { release(); return; }
   }
 
-  const cellCount = targets.length * terms.length;
-  if (targets.length > 1500 && !confirm(`本次将导出 ${targets.length} 个交易日 × ${terms.length} 个期限，约 ${(cellCount / 10000).toFixed(1)} 万个数据点，生成文件需要十几秒，手机端可能较慢。是否继续？`)) return;
-
+  // ③ 逐条曲线生成工作表
   const t0 = performance.now();
-  const ma = build750Series(data);
-
-  const cols = (mode === 'dates') ? ['请求日期', '实际交易日', ...terms] : ['日期', ...terms];
-  const rows = targets.map(t => {
-    const vals = terms.map((_, j) => ma[t.idx][j]);
-    return (mode === 'dates') ? [t.ask, t.date, ...vals] : [t.date, ...vals];
-  });
-
-  const ws = XLSX.utils.aoa_to_sheet([cols, ...rows]);
-  const ws2 = XLSX.utils.aoa_to_sheet([
-    ['项目', '说明'],
-    ['导出类型', mode === 'dates' ? `按关键日期（${targets.length} 个日期）` : `按区间（${rangeLabel}，共 ${targets.length} 个交易日）`],
-    ['曲线', curveName],
-    ['期限范围', `${terms[0]} ~ ${terms[terms.length - 1]}（共 ${terms.length} 个整数年期限）`],
-    ['750MA 口径', '对第 i 个交易日：窗口 = [i-749, i] 共 750 个交易日；取窗口内该期限所有非空值的算术平均'],
-    ['样本不足处理', '窗口内非空样本数不足 750 个时按实际非空样本平均；窗口内交易日数少于 20 个时不出值（留空）'],
-    ['暖机期提示', '数据起点后约 750 个交易日内 750MA 样本不满，建议使用 2011 年 1 月之后的满窗口结果'],
-    ['非交易日处理', mode === 'dates' ? '输入日期非交易日时，取该日前最近一个交易日，底稿同时保留"请求日期"与"实际交易日"两列' : '区间内仅输出真实交易日，非交易日无数据'],
-    ['数值单位', '百分数（1.4970 = 1.4970%），保留 6 位小数'],
-    ['数据源', '中债网 yield.chinabond.com.cn 官方接口，逐日抓取'],
-    ['数据最新日', data.dates[data.dates.length - 1]],
-    ['生成时间', new Date().toLocaleString('zh-CN')]
-  ]);
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, '750MA历史');
-  XLSX.utils.book_append_sheet(wb, ws2, '计算说明');
+  const summary = [], skipped = [];
+  const usedNames = {};
+  curves.forEach(c => {
+    const data = c.data, tms = data.terms;
+    const ts = [];
+    if (mode === 'dates') {
+      reqDates.forEach(d => {
+        const idx = resolveTradingIdx(data.dates, d);
+        if (idx < 0) { const s = d + '(早于该曲线数据起点)'; if (!bad.includes(s)) bad.push(s); }
+        else ts.push({ ask: d, date: data.dates[idx], idx });
+      });
+    } else {
+      const a = resolveTradingIdx(data.dates, start), b = resolveTradingIdx(data.dates, end);
+      if (a >= 0 && b >= a) for (let i = a; i <= b; i++) ts.push({ ask: '', date: data.dates[i], idx: i });
+    }
+    if (!ts.length) { skipped.push(c.name); return; }
+    const ma = build750Series(data);
+    const cols = ((mode === 'dates') ? ['请求日期', '实际交易日'] : ['日期']).concat(tms, E750_DERIVED);
+    const rows = ts.map(t => {
+      const vals = tms.map((_, j) => ma[t.idx][j]);
+      const head = (mode === 'dates') ? [t.ask, t.date] : [t.date];
+      return head.concat(vals, e750Derived(vals, tms));
+    });
+    let sheet = c.name.slice(0, 31);
+    while (usedNames[sheet]) sheet = c.name.slice(0, 29) + '_' + (++usedNames[c.name] + 1);
+    usedNames[sheet] = 1;
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([cols, ...rows]), sheet);
+    summary.push({ name: c.name, n: ts.length, first: ts[0].date, last: ts[ts.length - 1].date,
+                   latest: data.dates[data.dates.length - 1], days: data.dates.length });
+  });
+  if (!summary.length) {
+    info.textContent = `⚠️ 所选日期/区间在 ${skipped.join('、')} 中没有数据，未生成文件。`;
+    release(); return;
+  }
+
+  // ④ 说明页 + 落盘
+  const noteRows = [
+    ['项目', '说明'],
+    ['导出方式', mode === 'dates' ? `按关键日期（输入 ${reqDates.length} 个日期）` : `按区间（${rangeLabel}）`],
+    ['导出曲线', summary.map(s => s.name).join('、') + (skipped.length ? `；无数据未导出：${skipped.join('、')}` : '')],
+    ['期限范围', `${terms[0]} ~ ${terms[terms.length - 1]}（共 ${terms.length} 个整数年期限）`],
+    ['衍生列口径', '1-20Y均值＝该行 1Y~20Y 各整数年期限 750MA 的算术平均（保留 6 位小数）；10Y-1Y、5Y-1Y、30Y-10Y 由本表收益率列相减、四舍五入保留 2 位小数，单位 bp'],
+    ['750MA 口径', '对第 i 个交易日：窗口 = [i-749, i] 共 750 个交易日；取窗口内该期限所有非空值的算术平均'],
+    ['样本不足处理', '窗口内非空样本不足 750 个时按实际非空样本平均；窗口内交易日数少于 20 个时不出值（留空）'],
+    ['暖机期提示', '数据起点后约 750 个交易日内 750MA 样本不满，建议只用 2011 年 1 月 之后的满窗口结果'],
+    ['非交易日处理', mode === 'dates' ? '输入日期非交易日时，取该日前最近一个交易日，底稿保留“请求日期”与“实际交易日”两列' : '区间内仅输出真实交易日，非交易日无数据'],
+    ['数值单位', '收益率列为百分数（1.4970 即 1.4970%），保留 6 位小数；利差列为 bp'],
+    ['数据源', '中国债券信息网 yield.chinabond.com.cn 官方接口，每日 17:30 自动抓取'],
+    ['生成时间', new Date().toLocaleString('zh-CN')]
+  ];
+  summary.forEach(s => noteRows.push([`${s.name} 实际取数`, `${s.first} ~ ${s.last}，共 ${s.n} 个交易日（该曲线数据共 ${s.days} 个交易日，最新 ${s.latest}）`]));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(noteRows), '计算说明');
+
+  const curveTag = (summary.length === 1) ? summary[0].name : `${summary.length}条曲线`;
   const fname = (mode === 'dates')
-    ? `750MA曲线_关键日期_${curveName}.xlsx`
-    : `750MA曲线_${rangeLabel}_${curveName}.xlsx`;
+    ? `750MA曲线_关键日期_${curveTag}.xlsx`
+    : `750MA曲线_${rangeLabel}_${curveTag}.xlsx`;
   XLSX.writeFile(wb, fname);
 
+  const total = summary.reduce((a, s) => a + s.n, 0);
   const secs = ((performance.now() - t0) / 1000).toFixed(1);
-  info.textContent = `✅ 已导出 ${targets.length} 个交易日 × ${terms.length} 个期限（${curveName}，耗时 ${secs} 秒）→ ${fname}`
-    + (bad.length ? `；已跳过：${bad.join('、')}` : '');
+  info.textContent = `✅ 已导出 ${summary.length} 条曲线、共 ${total} 个交易日 × ${terms.length} 个期限 ＋ 4 个衍生列（耗时 ${secs} 秒）→ ${fname}`
+    + (skipped.length ? `；无数据未导出：${skipped.join('、')}` : '')
+    + (bad.length ? `；已跳过：${[...new Set(bad)].join('、')}` : '');
+  release();
+}
+
+// ── 使用说明面板（v40.1 新增） ──
+function toggleManual() {
+  const p = document.getElementById('manualPanel');
+  if (!p) return;
+  const show = (p.style.display !== 'block');
+  p.style.display = show ? 'block' : 'none';
+  document.body.style.overflow = show ? 'hidden' : '';
+  p.scrollTop = 0;
+  if (!p.dataset.escBound) {
+    p.dataset.escBound = '1';
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') { p.style.display = 'none'; document.body.style.overflow = ''; }
+    });
+  }
 }
 
 // ── 模式切换 ──
