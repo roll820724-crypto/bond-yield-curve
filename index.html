@@ -160,6 +160,28 @@ td.warn{background:#fff3cd}
       <div id="extrapInfo" style="font-size:11px;color:#888;margin-bottom:6px"></div>
       <div id="extrapTable"></div>
     </div>
+
+    <!-- ═══ 卡片7：导出历史750曲线（v40 新增） ═══ -->
+    <div class="chart-card">
+      <h2>📤 导出历史750曲线 <button onclick="export750History()" style="float:right;font-size:10px;padding:1px 6px;background:#2e75b6;color:#fff;border:none;border-radius:3px;cursor:pointer">📥 一键导出</button></h2>
+      <div class="card-desc">导出完整 750MA 期限结构（1Y–50Y）底稿，导出对象＝工具栏当前所选曲线。<br>
+      <b>按关键日期</b>：输入多个日期（换行、逗号、空格分隔均可，支持 2025-12-31 / 2025/12/31 / 20251231 三种写法），输出各日期对应的 750MA 期限结构；非交易日自动取该日前最近一个交易日并在底稿中标注。<br>
+      <b>按区间</b>：输入起始与结束日期，输出区间内每个交易日的 750MA 期限结构。口径与页面 calc750MA 一致（窗口 750 个交易日、窗口内非空值算术平均）。</div>
+      <div style="display:flex;gap:14px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
+        <label style="font-size:12px"><input type="radio" name="e750Mode" value="dates" checked onchange="onE750ModeChange()"> 按关键日期</label>
+        <label style="font-size:12px"><input type="radio" name="e750Mode" value="range" onchange="onE750ModeChange()"> 按区间</label>
+      </div>
+      <div id="e750DatesArea">
+        <textarea id="e750Dates" placeholder="每行一个日期，例如：&#10;2024-12-31&#10;2025-12-31&#10;2026-06-30&#10;2026-09-15" style="width:100%;max-width:520px;height:76px;font-size:12px;padding:6px;border:1px solid #ddd;border-radius:4px;font-family:ui-monospace,Menlo,monospace"></textarea>
+      </div>
+      <div id="e750RangeArea" style="display:none;gap:10px;align-items:center;flex-wrap:wrap">
+        <label style="font-size:12px">起始：</label>
+        <input type="date" id="e750Start" style="font-size:12px;padding:2px 4px">
+        <label style="font-size:12px;margin-left:10px">结束：</label>
+        <input type="date" id="e750End" style="font-size:12px;padding:2px 4px">
+      </div>
+      <div id="e750Info" style="font-size:11px;color:#888;margin-top:8px"></div>
+    </div>
   </div>
 </div>
 
@@ -432,6 +454,154 @@ function downloadFullCurve() {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, CURVE_NAMES[currentCurve]);
   XLSX.writeFile(wb, `全量利率曲线_${CURVE_NAMES[currentCurve]}.xlsx`);
+}
+
+// ═══════════════════════════════════════════════
+//  导出历史750曲线（v40 新增）
+//  两种方式：① 按关键日期（多个日期）② 按区间（每日）
+//  口径与 calc750MA 完全一致：窗口=[i-749, i] 共 750 个交易日，
+//  取窗口内非空值算术平均；窗口内交易日数 <20 时不出值。
+// ═══════════════════════════════════════════════
+
+function onE750ModeChange() {
+  const el = document.querySelector('input[name="e750Mode"]:checked');
+  const mode = el ? el.value : 'dates';
+  document.getElementById('e750DatesArea').style.display = (mode === 'dates') ? '' : 'none';
+  document.getElementById('e750RangeArea').style.display = (mode === 'range') ? 'flex' : 'none';
+  document.getElementById('e750Info').textContent = '';
+}
+
+// 日期归一化：2025-12-31 / 2025/12/31 / 2025.12.31 / 20251231 / 2025年12月31日
+function normDateStr(s) {
+  s = String(s).trim();
+  let m = s.match(/^(\d{4})\s*[-/.年]\s*(\d{1,2})\s*[-/.月]\s*(\d{1,2})\s*日?$/);
+  if (m) return `${m[1]}-${String(m[2]).padStart(2, '0')}-${String(m[3]).padStart(2, '0')}`;
+  m = s.match(/^(\d{4})(\d{2})(\d{2})$/);
+  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  return null;
+}
+
+// 解析用户输入的日期串（支持换行/逗号/分号/顿号/空格分隔）
+function parseDateList(text) {
+  const parts = String(text || '').split(/[\s,，;；、]+/).filter(Boolean);
+  const ok = [], bad = [];
+  parts.forEach(p => { const d = normDateStr(p); if (d) ok.push(d); else bad.push(p); });
+  return { dates: [...new Set(ok)].sort(), bad };
+}
+
+// 与 calc750MA 同口径的 750MA 全序列（滑动窗口累加，O(n×期限数)）
+function build750Series(data) {
+  const n = data.dates.length, m = data.terms.length;
+  const ma = Array.from({ length: n }, () => new Array(m).fill(null));
+  const sum = new Array(m).fill(0), cnt = new Array(m).fill(0);
+  for (let i = 0; i < n; i++) {
+    const row = data.rows[i];
+    for (let j = 0; j < m; j++) { const v = row[j]; if (v != null && !isNaN(v)) { sum[j] += v; cnt[j]++; } }
+    const drop = i - 750;                                   // 离开窗口的样本
+    if (drop >= 0) {
+      const r2 = data.rows[drop];
+      for (let j = 0; j < m; j++) { const v = r2[j]; if (v != null && !isNaN(v)) { sum[j] -= v; cnt[j]--; } }
+    }
+    const winDays = Math.min(i, 749) + 1;                   // 窗口内交易日数
+    if (winDays >= 20) {
+      for (let j = 0; j < m; j++) if (cnt[j] > 0) ma[i][j] = +(sum[j] / cnt[j]).toFixed(6);
+    }
+  }
+  return ma;
+}
+
+// 找 <= target 的最近交易日索引（二分），早于数据起点返回 -1
+function resolveTradingIdx(dates, target) {
+  let lo = 0, hi = dates.length - 1, ans = -1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (dates[mid] <= target) { ans = mid; lo = mid + 1; } else hi = mid - 1;
+  }
+  return ans;
+}
+
+// 日期控件范围与默认值（数据起点~最新日，默认展示最近一年区间）
+function syncE750DateBounds(data) {
+  const s = document.getElementById('e750Start'), e = document.getElementById('e750End');
+  if (!s || !e || !data || !data.dates.length) return;
+  const first = data.dates[0], latest = data.dates[data.dates.length - 1];
+  s.min = first; s.max = latest; e.min = first; e.max = latest;
+  if (!s.value || s.value < first || s.value > latest) s.value = data.dates[Math.max(0, data.dates.length - 251)];
+  if (!e.value || e.value < first || e.value > latest) e.value = latest;
+}
+
+function export750History() {
+  const data = getData(currentCurve);
+  const info = document.getElementById('e750Info');
+  if (!data.dates.length) { alert('数据尚未加载完成，请稍候再试。'); return; }
+  const el = document.querySelector('input[name="e750Mode"]:checked');
+  const mode = el ? el.value : 'dates';
+  const terms = data.terms;
+  const curveName = CURVE_NAMES[currentCurve] || currentCurve;
+
+  const targets = [];   // {ask: 请求日期, date: 实际交易日, idx}
+  let rangeLabel = '';
+  const bad = [];
+
+  if (mode === 'dates') {
+    const { dates, bad: badRaw } = parseDateList(document.getElementById('e750Dates').value);
+    bad.push(...badRaw);
+    if (!dates.length) { alert('请先输入至少一个日期。'); return; }
+    dates.forEach(d => {
+      const idx = resolveTradingIdx(data.dates, d);
+      if (idx < 0) bad.push(d + '(早于数据起点)');
+      else targets.push({ ask: d, date: data.dates[idx], idx });
+    });
+    if (!targets.length) { alert(`输入的日期都早于数据起点 ${data.dates[0]}，无法取值。`); return; }
+  } else {
+    const s = document.getElementById('e750Start').value, e = document.getElementById('e750End').value;
+    if (!s || !e) { alert('请先选择起始和结束日期。'); return; }
+    if (s > e) { alert('起始日期不能晚于结束日期，请调整。'); return; }
+    const i0 = resolveTradingIdx(data.dates, s), i1 = resolveTradingIdx(data.dates, e);
+    if (i0 < 0) { alert(`起始日期早于数据起点 ${data.dates[0]}。`); return; }
+    if (i1 < i0) { alert('该区间内没有交易日数据。'); return; }
+    for (let i = i0; i <= i1; i++) targets.push({ ask: '', date: data.dates[i], idx: i });
+    rangeLabel = `${data.dates[i0]}至${data.dates[i1]}`;
+  }
+
+  const cellCount = targets.length * terms.length;
+  if (targets.length > 1500 && !confirm(`本次将导出 ${targets.length} 个交易日 × ${terms.length} 个期限，约 ${(cellCount / 10000).toFixed(1)} 万个数据点，生成文件需要十几秒，手机端可能较慢。是否继续？`)) return;
+
+  const t0 = performance.now();
+  const ma = build750Series(data);
+
+  const cols = (mode === 'dates') ? ['请求日期', '实际交易日', ...terms] : ['日期', ...terms];
+  const rows = targets.map(t => {
+    const vals = terms.map((_, j) => ma[t.idx][j]);
+    return (mode === 'dates') ? [t.ask, t.date, ...vals] : [t.date, ...vals];
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet([cols, ...rows]);
+  const ws2 = XLSX.utils.aoa_to_sheet([
+    ['项目', '说明'],
+    ['导出类型', mode === 'dates' ? `按关键日期（${targets.length} 个日期）` : `按区间（${rangeLabel}，共 ${targets.length} 个交易日）`],
+    ['曲线', curveName],
+    ['期限范围', `${terms[0]} ~ ${terms[terms.length - 1]}（共 ${terms.length} 个整数年期限）`],
+    ['750MA 口径', '对第 i 个交易日：窗口 = [i-749, i] 共 750 个交易日；取窗口内该期限所有非空值的算术平均'],
+    ['样本不足处理', '窗口内非空样本数不足 750 个时按实际非空样本平均；窗口内交易日数少于 20 个时不出值（留空）'],
+    ['暖机期提示', '数据起点后约 750 个交易日内 750MA 样本不满，建议使用 2011 年 1 月之后的满窗口结果'],
+    ['非交易日处理', mode === 'dates' ? '输入日期非交易日时，取该日前最近一个交易日，底稿同时保留"请求日期"与"实际交易日"两列' : '区间内仅输出真实交易日，非交易日无数据'],
+    ['数值单位', '百分数（1.4970 = 1.4970%），保留 6 位小数'],
+    ['数据源', '中债网 yield.chinabond.com.cn 官方接口，逐日抓取'],
+    ['数据最新日', data.dates[data.dates.length - 1]],
+    ['生成时间', new Date().toLocaleString('zh-CN')]
+  ]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '750MA历史');
+  XLSX.utils.book_append_sheet(wb, ws2, '计算说明');
+  const fname = (mode === 'dates')
+    ? `750MA曲线_关键日期_${curveName}.xlsx`
+    : `750MA曲线_${rangeLabel}_${curveName}.xlsx`;
+  XLSX.writeFile(wb, fname);
+
+  const secs = ((performance.now() - t0) / 1000).toFixed(1);
+  info.textContent = `✅ 已导出 ${targets.length} 个交易日 × ${terms.length} 个期限（${curveName}，耗时 ${secs} 秒）→ ${fname}`
+    + (bad.length ? `；已跳过：${bad.join('、')}` : '');
 }
 
 // ── 模式切换 ──
@@ -897,6 +1067,9 @@ function renderMode1(data, row, prevRow, lastMonthRow) {
     renderMode1Comparison();
     initExtrapDate();
   })();
+
+  // 初始化「导出历史750曲线」日期控件（v40）
+  syncE750DateBounds(data);
 }
 
 // 时点对比表格
