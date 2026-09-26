@@ -124,6 +124,28 @@ def save_json(filepath, data):
         json.dump(data, f, ensure_ascii=False)
     os.replace(tmp, filepath)
 
+def same_curve(row_a, row_b):
+    """两行曲线是否逐点完全相同。
+
+    中债网对非交易日（周末/节假日）的请求会回显上一交易日的曲线，
+    仅把请求日期盖在文件里，数值一条不变。这种行不是真实新数据，
+    直接入库会生成"占位行"（如 2026-09-25 中秋节）。
+    """
+    if row_a is None or row_b is None:
+        return False
+    if len(row_a) != len(row_b):
+        return False
+    valid = 0
+    for x, y in zip(row_a, row_b):
+        if x is None or y is None:
+            if x != y:
+                return False
+            continue
+        if x != y:
+            return False
+        valid += 1
+    return valid >= 20
+
 # ============ 更新函数 ============
 def update_curve(name, fetch_fn, data_file, today_str):
     print(f"\n{'─'*40}")
@@ -162,9 +184,21 @@ def update_curve(name, fetch_fn, data_file, today_str):
     date_to_row = {}
     for i, d in enumerate(existing["dates"]):
         date_to_row[d] = existing["rows"][i]
+    prev_row = existing["rows"][-1] if existing["rows"] else None
+    dup_days = []
     for d in sorted(all_new.keys()):
-        date_to_row[d] = [all_new[d].get(t) for t in ALL_TERMS]
-    
+        row = [all_new[d].get(t) for t in ALL_TERMS]
+        if same_curve(row, prev_row):
+            dup_days.append(d)
+            continue
+        date_to_row[d] = row
+        prev_row = row
+    if dup_days:
+        print(f"  ⚠ 跳过 {len(dup_days)} 个与上一交易日逐点完全相同的日期（非交易日接口回显）: {', '.join(dup_days)}")
+        if len(dup_days) == len(all_new):
+            print(f" ⚠ [{name}] 没有新数据（仅接口回显上一交易日曲线）")
+            return False
+
     sorted_dates = sorted(date_to_row.keys())
     sorted_rows = [date_to_row[d] for d in sorted_dates]
     
